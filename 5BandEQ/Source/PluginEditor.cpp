@@ -1,4 +1,5 @@
 #include "PluginEditor.h"
+#include "DSP/FilterTypes.h"
 
 //==============================================================================
 FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
@@ -7,9 +8,9 @@ FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
     // Set editor size - increased height for freq/Q controls
     setSize(800, 400);
 
-    // Setup band controls - each band gets gain, frequency, and Q controls
+    // Setup band controls - each band gets gain, frequency, Q, and filter type controls
     const juce::String bandNames[5] = {"Low", "Low-Mid", "Mid", "High-Mid", "High"};
-    const juce::String paramNames[3] = {"Gain", "Freq", "Q"};
+    const juce::String paramNames[4] = {"Gain", "Freq", "Q", "Type"};
 
     for (int i = 0; i < 5; ++i)
     {
@@ -19,10 +20,10 @@ FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
         bandLabels[i].setColour(juce::Label::textColourId, juce::Colours::white);
         addAndMakeVisible(bandLabels[i]);
 
-        // Setup parameter labels (Gain, Freq, Q for each band)
-        for (int j = 0; j < 3; ++j)
+        // Setup parameter labels (Gain, Freq, Q, Type for each band)
+        for (int j = 0; j < 4; ++j)
         {
-            int labelIndex = i * 3 + j;
+            int labelIndex = i * 4 + j;
             paramLabels[labelIndex].setText(paramNames[j], juce::dontSendNotification);
             paramLabels[labelIndex].setJustificationType(juce::Justification::centred);
             paramLabels[labelIndex].setColour(juce::Label::textColourId, juce::Colours::lightgrey);
@@ -57,6 +58,55 @@ FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
         qSliders[i].setColour(juce::Slider::rotarySliderFillColourId, juce::Colours::yellow);
         addAndMakeVisible(qSliders[i]);
 
+        // Setup filter type ComboBox with band-specific options
+        filterTypeBoxes[i].setColour(juce::ComboBox::backgroundColourId, juce::Colours::darkgrey);
+        filterTypeBoxes[i].setColour(juce::ComboBox::textColourId, juce::Colours::white);
+        filterTypeBoxes[i].setColour(juce::ComboBox::arrowColourId, juce::Colours::lightblue);
+        filterTypeBoxes[i].setJustificationType(juce::Justification::centred);
+
+        // Add filter type options based on band restrictions
+        BandPosition position;
+        if (i == 0)
+            position = BandPosition::Low;
+        else if (i == 1)
+            position = BandPosition::LowMid;
+        else if (i == 2)
+            position = BandPosition::Mid;
+        else if (i == 3)
+            position = BandPosition::HighMid;
+        else
+            position = BandPosition::High;
+
+        auto availableTypes = FilterTypeRestrictions::getAvailableTypes(position);
+        int itemId = 1;
+
+        for (auto type : availableTypes)
+        {
+            switch (type)
+            {
+            case FilterType::Peak:
+                filterTypeBoxes[i].addItem("Peak", itemId++);
+                break;
+            case FilterType::LowCut:
+                filterTypeBoxes[i].addItem("Low Cut", itemId++);
+                break;
+            case FilterType::LowShelf:
+                filterTypeBoxes[i].addItem("Low Shelf", itemId++);
+                break;
+            case FilterType::HighCut:
+                filterTypeBoxes[i].addItem("High Cut", itemId++);
+                break;
+            case FilterType::HighShelf:
+                filterTypeBoxes[i].addItem("High Shelf", itemId++);
+                break;
+            case FilterType::Disabled:
+                filterTypeBoxes[i].addItem("Disabled", itemId++);
+                break;
+            }
+        }
+
+        addAndMakeVisible(filterTypeBoxes[i]);
+
         // Create parameter attachments
         juce::String bandPrefix = "band" + juce::String(i + 1);
         gainAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
@@ -65,6 +115,8 @@ FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
             audioProcessor.getAPVTS(), bandPrefix + "_freq", freqSliders[i]);
         qAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
             audioProcessor.getAPVTS(), bandPrefix + "_q", qSliders[i]);
+        typeAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
+            audioProcessor.getAPVTS(), bandPrefix + "_type", filterTypeBoxes[i]);
     }
 
     // Setup bypass button (toggle style)
@@ -132,27 +184,34 @@ void FiveBandEQProcessorEditor::resized()
         // Band label at top
         bandLabels[i].setBounds(currentBandArea.removeFromTop(25));
 
-        // Create areas for the three controls per band
+        // Create areas for the four controls per band
         auto controlArea = currentBandArea;
 
         // Top row: Frequency and Q controls (rotary knobs)
-        auto topRow = controlArea.removeFromTop(120);
+        auto topRow = controlArea.removeFromTop(105);
         auto freqArea = topRow.removeFromLeft(topRow.getWidth() / 2).reduced(5);
         auto qArea = topRow.reduced(5);
 
-        // Labels for freq and Q
-        int freqLabelIndex = i * 3 + 1; // Freq is second param
-        int qLabelIndex = i * 3 + 2;    // Q is third param
+        // Labels for freq and Q (updated indexing for 4 params per band)
+        int freqLabelIndex = i * 4 + 1; // Freq is second param
+        int qLabelIndex = i * 4 + 2;    // Q is third param
 
         paramLabels[freqLabelIndex].setBounds(freqArea.removeFromTop(15));
-        freqSliders[i].setBounds(freqArea.removeFromTop(80));
+        freqSliders[i].setBounds(freqArea.removeFromTop(75));
 
         paramLabels[qLabelIndex].setBounds(qArea.removeFromTop(15));
-        qSliders[i].setBounds(qArea.removeFromTop(80));
+        qSliders[i].setBounds(qArea.removeFromTop(75));
+
+        // Middle row: Filter type ComboBox
+        auto typeArea = controlArea.removeFromTop(40).reduced(10, 5);
+        int typeLabelIndex = i * 4 + 3; // Type is fourth param
+
+        paramLabels[typeLabelIndex].setBounds(typeArea.removeFromTop(15));
+        filterTypeBoxes[i].setBounds(typeArea);
 
         // Bottom: Gain slider (vertical)
         auto gainArea = controlArea.reduced(15, 5);
-        int gainLabelIndex = i * 3; // Gain is first param
+        int gainLabelIndex = i * 4; // Gain is first param (updated indexing)
 
         paramLabels[gainLabelIndex].setBounds(gainArea.removeFromTop(15));
         gainSliders[i].setBounds(gainArea);

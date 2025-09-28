@@ -1,12 +1,13 @@
 #include "PluginEditor.h"
 #include "DSP/FilterTypes.h"
+#include "GUI/FrequencyResponseDisplay.cpp"
 
 //==============================================================================
 FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
     : AudioProcessorEditor(&p), audioProcessor(p)
 {
-    // Set editor size - increased height for freq/Q controls
-    setSize(800, 400);
+    // Set editor size - increased height for frequency response display and controls
+    setSize(800, 550);
 
     // Setup band controls - each band gets gain, frequency, Q, and filter type controls
     const juce::String bandNames[5] = {"Low", "Low-Mid", "Mid", "High-Mid", "High"};
@@ -128,6 +129,26 @@ FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
 
     // Create bypass parameter attachment
     bypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(audioProcessor.getAPVTS(), "bypass", bypassButton);
+
+    // Setup frequency response display
+    addAndMakeVisible(frequencyResponseDisplay);
+    frequencyResponseDisplay.setSampleRate(audioProcessor.getSampleRate());
+
+    // Set up parameter listeners for real-time updates
+    for (int i = 0; i < 5; ++i)
+    {
+        gainSliders[i].onValueChange = [this]
+        { updateFrequencyResponse(); };
+        freqSliders[i].onValueChange = [this]
+        { updateFrequencyResponse(); };
+        qSliders[i].onValueChange = [this]
+        { updateFrequencyResponse(); };
+        filterTypeBoxes[i].onChange = [this]
+        { updateFrequencyResponse(); };
+    }
+
+    // Initial update
+    updateFrequencyResponse();
 }
 
 FiveBandEQProcessorEditor::~FiveBandEQProcessorEditor()
@@ -168,6 +189,10 @@ void FiveBandEQProcessorEditor::resized()
 
     // Reserve space for title
     auto titleArea = bounds.removeFromTop(60);
+
+    // Reserve space for frequency response display at top
+    auto responseArea = bounds.removeFromTop(150);
+    frequencyResponseDisplay.setBounds(responseArea.reduced(20, 10));
 
     // Reserve space for bypass button at bottom
     auto bottomArea = bounds.removeFromBottom(50);
@@ -215,5 +240,43 @@ void FiveBandEQProcessorEditor::resized()
 
         paramLabels[gainLabelIndex].setBounds(gainArea.removeFromTop(15));
         gainSliders[i].setBounds(gainArea);
+    }
+}
+
+void FiveBandEQProcessorEditor::updateFrequencyResponse()
+{
+    // Get current parameter values and update the frequency response display
+    for (int i = 0; i < 5; ++i)
+    {
+        float gain = static_cast<float>(gainSliders[i].getValue());
+        float freq = static_cast<float>(freqSliders[i].getValue());
+        float q = static_cast<float>(qSliders[i].getValue());
+        int filterType = filterTypeBoxes[i].getSelectedId() - 1; // Adjust for 0-based index
+
+        // Map ComboBox selection to FilterType enum
+        // This needs to account for the restricted types per band
+        BandPosition position;
+        if (i == 0)
+            position = BandPosition::Low;
+        else if (i == 1)
+            position = BandPosition::LowMid;
+        else if (i == 2)
+            position = BandPosition::Mid;
+        else if (i == 3)
+            position = BandPosition::HighMid;
+        else
+            position = BandPosition::High;
+
+        auto availableTypes = FilterTypeRestrictions::getAvailableTypes(position);
+
+        // Convert to actual filter type enum
+        FilterType actualType = FilterType::Peak; // default
+        if (filterType >= 0 && filterType < static_cast<int>(availableTypes.size()))
+        {
+            actualType = availableTypes[filterType];
+        }
+
+        // Update the frequency response display with band parameters
+        frequencyResponseDisplay.setBandParameters(i, freq, gain, q, static_cast<int>(actualType));
     }
 }

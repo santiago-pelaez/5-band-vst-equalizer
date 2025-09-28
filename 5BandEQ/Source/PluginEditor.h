@@ -1,9 +1,10 @@
 #pragma once
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "GUI/FrequencyResponseDisplay.h"
 
 /**
- * Main GUI editor for the 5-band EQ with restricted filter types
+ * Main GUI editor for the 5-band EQ with restricted filter types and frequency response visualization
  */
 class FiveBandEQProcessorEditor : public juce::AudioProcessorEditor
 {
@@ -15,10 +16,14 @@ public:
     void paint(juce::Graphics &) override;
     void resized() override;
 
+    // Update frequency response visualization
+    void updateFrequencyResponse();
+
 private:
     FiveBandEQProcessor &audioProcessor;
 
     // GUI Components
+    FrequencyResponseDisplay frequencyResponseDisplay;
     juce::Slider gainSliders[5];
     juce::Slider freqSliders[5];
     juce::Slider qSliders[5];

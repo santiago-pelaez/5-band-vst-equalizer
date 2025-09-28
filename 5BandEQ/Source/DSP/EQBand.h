@@ -98,6 +98,11 @@ public:
             paramsChanged = true;
         }
 
+        // Skip processing if gain is essentially 0dB (transparent)
+        float currentGain = gainSmooth.getCurrentValue();
+        if (std::abs(currentGain) < 0.01f) // Less than 0.01dB difference
+            return;
+
         if (paramsChanged)
             updateFilters();
 

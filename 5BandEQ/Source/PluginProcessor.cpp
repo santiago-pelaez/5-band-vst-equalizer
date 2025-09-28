@@ -170,10 +170,13 @@ void FiveBandEQProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::M
             band->processStereo(left, right);
         }
 
-        // Apply output gain
+        // Apply output gain (bypass if close to unity gain)
         float gain = outputGain.getNextValue();
-        left *= gain;
-        right *= gain;
+        if (std::abs(gain - 1.0f) > 0.001f) // Only apply if gain is significantly different from 1.0
+        {
+            left *= gain;
+            right *= gain;
+        }
 
         leftChannel[sample] = left;
         rightChannel[sample] = right;

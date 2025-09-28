@@ -22,6 +22,18 @@ public:
         calculateCoefficients(type, frequency, gain, Q);
     }
 
+    // Coefficient structure for frequency response analysis
+    struct Coefficients
+    {
+        float b0, b1, b2, a1, a2;
+    };
+
+    // Get current filter coefficients for frequency response calculation
+    Coefficients getCoefficients() const
+    {
+        return {b0, b1, b2, a1, a2};
+    }
+
     float processSample(float input)
     {
         // Direct Form II Transposed implementation

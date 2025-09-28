@@ -3,13 +3,15 @@
 ## Band Restrictions Implementation
 
 ### Band Configuration
+
 - **Band 1 (Low)**: Only `LowCut` (high-pass) and `LowShelf` filters
-- **Band 5 (High)**: Only `HighCut` (low-pass) and `HighShelf` filters  
+- **Band 5 (High)**: Only `HighCut` (low-pass) and `HighShelf` filters
 - **Bands 2, 3, 4**: Full parametric with `Peak`, `LowShelf`, `HighShelf` options
 
 ### Key Implementation Features
 
 #### 1. Filter Type Restrictions (`FilterTypes.h`)
+
 ```cpp
 class FilterTypeRestrictions
 {
@@ -19,6 +21,7 @@ class FilterTypeRestrictions
 ```
 
 #### 2. Biquad Filter Implementation (`BiquadFilter.h`)
+
 - Direct Form II Transposed structure for stability
 - Coefficient calculations for all filter types:
   - Peak/Notch: Standard peaking EQ
@@ -26,16 +29,19 @@ class FilterTypeRestrictions
   - Low/High Cut: Butterworth-style filters
 
 #### 3. Individual EQ Bands (`EQBand.h`)
+
 - Parameter smoothing to avoid clicks/pops
 - Band position-aware filter type validation
 - Stereo processing with matched left/right filters
 
 #### 4. Parameter System (`Parameters.h`)
+
 - Automatic parameter layout generation
 - Filter type choices restricted per band
 - Full DAW automation support
 
 #### 5. Main Processor (`PluginProcessor.h/cpp`)
+
 - 5 bands in series processing
 - Real-time parameter updates
 - State save/restore functionality
@@ -43,6 +49,7 @@ class FilterTypeRestrictions
 ## JUCE Project Setup
 
 ### Required JUCE Modules
+
 ```
 juce_audio_basics
 juce_audio_devices
@@ -60,6 +67,7 @@ juce_dsp
 ```
 
 ### Plugin Configuration
+
 ```cpp
 #define JucePlugin_Name                 "5BandEQ"
 #define JucePlugin_Desc                 "5-Band Parametric Equalizer"
@@ -88,6 +96,7 @@ juce_dsp
 ## Next Development Steps
 
 ### Phase 1: Core DSP (Current)
+
 - ✅ Basic project structure
 - ✅ Filter type restrictions
 - ✅ Biquad filter implementation
@@ -96,13 +105,15 @@ juce_dsp
 - ✅ Main processor
 
 ### Phase 2: GUI Development
+
 - [ ] Spectrum analyzer component
 - [ ] Draggable EQ nodes
 - [ ] Band control panels with restrictions
 - [ ] Real-time frequency response display
 - [ ] Visual feedback for active bands
 
-### Phase 3: Advanced Features  
+### Phase 3: Advanced Features
+
 - [ ] Preset management system
 - [ ] Factory presets (vocal, instrumental, etc.)
 - [ ] Real-time spectrum analysis
@@ -110,6 +121,7 @@ juce_dsp
 - [ ] Undo/redo functionality
 
 ### Phase 4: Polish & Distribution
+
 - [ ] CPU optimization
 - [ ] Extensive testing across DAWs
 - [ ] Documentation and help system
@@ -119,18 +131,21 @@ juce_dsp
 ## Testing Strategy
 
 ### Unit Tests
+
 - Filter coefficient accuracy
 - Parameter range validation
 - Band restriction enforcement
 - State save/restore integrity
 
-### Integration Tests  
+### Integration Tests
+
 - Multi-DAW compatibility (Reaper, Logic, Live, etc.)
 - Automation parameter mapping
 - Real-time performance under load
 - Preset compatibility
 
 ### Audio Quality Tests
+
 - Frequency response accuracy
 - Phase response linearity
 - THD+N measurements

@@ -8,15 +8,15 @@
 class FiveBandEQProcessorEditor : public juce::AudioProcessorEditor
 {
 public:
-    FiveBandEQProcessorEditor (FiveBandEQProcessor&);
+    FiveBandEQProcessorEditor(FiveBandEQProcessor &);
     ~FiveBandEQProcessorEditor() override;
 
     //==============================================================================
-    void paint (juce::Graphics&) override;
+    void paint(juce::Graphics &) override;
     void resized() override;
 
 private:
-    FiveBandEQProcessor& audioProcessor;
+    FiveBandEQProcessor &audioProcessor;
 
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (FiveBandEQProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FiveBandEQProcessorEditor)
 };

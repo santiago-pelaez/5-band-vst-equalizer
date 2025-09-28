@@ -5,7 +5,7 @@ A professional 5-band parametric equalizer VST3/AU plugin built with JUCE framew
 ## Features
 
 - **5 Parametric Bands** with frequency, gain, and Q controls
-- **Band 1 (Low)**: Low cut (high-pass) and low shelf filters only  
+- **Band 1 (Low)**: Low cut (high-pass) and low shelf filters only
 - **Bands 2, 3, 4 (Mid)**: Full parametric (peak/notch, shelf, cut filters)
 - **Band 5 (High)**: High cut (low-pass) and high shelf filters only
 - Real-time spectrum analyzer display
@@ -49,11 +49,13 @@ A professional 5-band parametric equalizer VST3/AU plugin built with JUCE framew
 ## Build Instructions
 
 ### Prerequisites
+
 - JUCE Framework 7.x
 - Visual Studio 2022 (Windows) or Xcode 14+ (macOS)
 - CMake 3.15+
 
 ### Building
+
 1. Download and install JUCE from juce.com
 2. Open the .jucer file in Projucer
 3. Configure your target platforms (VST3, AU, etc.)

@@ -3,6 +3,7 @@
 ## Current Status (September 2025)
 
 ### ✅ Completed Features
+
 - **Full DSP Engine**: 5-band parametric EQ with professional biquad filters and band restrictions
 - **Parameter System**: Complete APVTS integration with automation support and real-time updates
 - **Parametric GUI**: Gain, frequency, and Q controls for all bands with proper parameter binding
@@ -10,14 +11,16 @@
 - **Real-time Processing**: Live parameter updates with toggle bypass functionality
 - **Build System**: Working MSBuild integration with VS Code tasks for development workflow
 
-### 🚧 In Progress  
+### 🚧 In Progress
+
 - Filter type selectors (ComboBox implementation per band)
 - Professional visual styling (EQ Eight/Pro-Q inspired design)
 - Enhanced user experience improvements
 
 ### 📋 Next Priorities
+
 1. Implement filter type selection per band with proper restrictions
-2. Add interactive EQ curve visualization 
+2. Add interactive EQ curve visualization
 3. Apply professional visual design and color schemes
 4. Implement preset management system
 5. Add real-time spectrum analyzer
@@ -161,6 +164,7 @@ juce_dsp
 ## Testing Strategy
 
 ### Verified Functionality ✅
+
 - ✅ Parameter binding accuracy and real-time updates
 - ✅ DSP processing with all filter types (Peak, Shelf, Cut)
 - ✅ Band restriction enforcement in parameter system
@@ -171,12 +175,14 @@ juce_dsp
 ### Remaining Tests
 
 #### Unit Tests
+
 - [ ] Filter coefficient accuracy validation
 - [ ] Parameter range boundary testing
 - [ ] State save/restore integrity
 - [ ] GUI component interaction testing
 
-#### Integration Tests  
+#### Integration Tests
+
 - [ ] Multi-DAW compatibility (Reaper, Logic, Live, etc.)
 - [ ] VST3/AU format validation across hosts
 - [ ] Automation parameter mapping verification
@@ -184,7 +190,8 @@ juce_dsp
 - [ ] Preset compatibility and recall accuracy
 
 #### Audio Quality Tests
+
 - [ ] Frequency response accuracy measurements
-- [ ] Phase response linearity analysis  
+- [ ] Phase response linearity analysis
 - [ ] THD+N distortion measurements
 - [ ] CPU usage profiling and optimization

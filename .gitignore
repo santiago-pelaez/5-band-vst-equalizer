@@ -1,0 +1,31 @@
+# VST Plugin Build Files
+Builds/
+JuceLibraryCode/
+
+# IDE Files
+.vs/
+.vscode/
+*.vcxproj.user
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.sdf
+*.opensdf
+*.suo
+.DS_Store
+
+# Compiled Output
+*.dll
+*.dylib
+*.vst3
+*.component
+*.aax
+
+# Temporary Files
+Temp/
+*.tmp
+*.log
+
+# User Settings
+*.user
+*.userprefs

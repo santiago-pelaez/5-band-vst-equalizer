@@ -4,7 +4,13 @@
 #include "Utils/Constants.h"
 
 /**
- * Parameter identifiers for automation
+ *             // EXTREME TEST CONFIGURATION: Maximum drama to prove DSP is working!
+            float testGainDefaults[5] = { 12.0f, -15.0f, 18.0f, -10.0f, 15.0f };
+            // Band 1 (Low Shelf): +12dB massive bass boost (will sound HUGE)
+            // Band 2 (Low-Mid Peak): -15dB deep notch (will remove mud completely)
+            // Band 3 (Mid Peak): +18dB extreme presence boost (vocals/instruments will jump out)
+            // Band 4 (High-Mid Peak): -10dB significant cut (tame harsh frequencies)
+            // Band 5 (High Shelf): +15dB massive treble boost (crystal clear highs)er identifiers for automation
  */
 namespace ParameterIDs
 {
@@ -102,17 +108,25 @@ public:
                 juce::NormalisableRange<float>(EQConstants::FREQUENCY_MIN, EQConstants::FREQUENCY_MAX, 1.0f, 0.25f),
                 EQConstants::BAND_FREQUENCIES[bandNum], "Hz"));
 
+            // NEUTRAL CONFIGURATION: All gains at 0dB (bypass simulation)
+            float testGainDefaults[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+            // All bands: 0dB = transparent/neutral (simulates bypass)
+            // Change these values to hear DSP processing
+
             // Gain parameter
             params.push_back(std::make_unique<juce::AudioParameterFloat>(
                 prefix + "_gain", prefix + " Gain",
                 juce::NormalisableRange<float>(EQConstants::GAIN_MIN, EQConstants::GAIN_MAX, 0.1f),
-                0.0f, "dB"));
+                testGainDefaults[bandNum], "dB"));
 
-            // Q parameter
+            // Q parameter - using higher Q for dramatic sharp peaks/cuts
+            float testQDefaults[5] = {0.7f, 8.0f, 12.0f, 6.0f, 0.7f};
+            // Band 1 & 5 (Shelves): Lower Q for smooth shelf response
+            // Bands 2, 3, 4 (Peaks): Very high Q for surgical precision cuts/boosts
             params.push_back(std::make_unique<juce::AudioParameterFloat>(
                 prefix + "_q", prefix + " Q",
                 juce::NormalisableRange<float>(EQConstants::Q_MIN, EQConstants::Q_MAX, 0.01f, 0.3f),
-                1.0f));
+                testQDefaults[bandNum]));
 
             // Enabled parameter
             params.push_back(std::make_unique<juce::AudioParameterBool>(

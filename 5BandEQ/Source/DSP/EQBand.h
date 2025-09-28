@@ -32,11 +32,11 @@ public:
         qSmooth.setCurrentAndTargetValue(1.0f);
     }
 
-    void setSampleRate(double sampleRate)
+    void setSampleRate(double newSampleRate)
     {
-        this->sampleRate = sampleRate;
-        leftFilter.setSampleRate(sampleRate);
-        rightFilter.setSampleRate(sampleRate);
+        this->sampleRate = newSampleRate;
+        leftFilter.setSampleRate(newSampleRate);
+        rightFilter.setSampleRate(newSampleRate);
 
         // Set smoothing time (10ms for parameter changes)
         double smoothingTime = 0.01;
@@ -78,9 +78,9 @@ public:
             q));
     }
 
-    void setEnabled(bool enabled)
+    void setEnabled(bool isEnabled)
     {
-        this->enabled = enabled;
+        this->enabled = isEnabled;
     }
 
     void processStereo(float &left, float &right)

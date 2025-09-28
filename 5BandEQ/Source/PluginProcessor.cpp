@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "JucePluginDefines.h"
 
 //==============================================================================
 FiveBandEQProcessor::FiveBandEQProcessor()
@@ -107,7 +108,7 @@ void FiveBandEQProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     // Setup output gain smoothing
     outputGain.reset(sampleRate, 0.01); // 10ms smoothing
     outputGain.setCurrentAndTargetValue(juce::Decibels::decibelsToGain(
-        *apvts.getRawParameterValue("output_gain")));
+        apvts.getRawParameterValue("output_gain")->load()));
 
     // Initialize all bands from current parameter values
     for (int i = 0; i < EQConstants::NUM_BANDS; ++i)

@@ -7,7 +7,8 @@
 /**
  * Main plugin processor handling 5-band EQ with restricted filter types
  */
-class FiveBandEQProcessor : public juce::AudioProcessor
+class FiveBandEQProcessor : public juce::AudioProcessor,
+                            public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     FiveBandEQProcessor();
@@ -47,6 +48,10 @@ public:
     void setStateInformation(const void *data, int sizeInBytes) override;
 
     //==============================================================================
+    // AudioProcessorValueTreeState::Listener interface
+    void parameterChanged(const juce::String &parameterID, float newValue) override;
+
+    //==============================================================================
     // Parameter access for editor
     juce::AudioProcessorValueTreeState &getAPVTS() { return apvts; }
 
@@ -66,8 +71,7 @@ private:
     juce::SmoothedValue<float> outputGain;
     std::atomic<bool> bypassed{false};
 
-    // Parameter listeners
-    void parameterChanged(const juce::String &parameterID, float newValue);
+    // Helper methods
     void updateBandFromParameters(int bandIndex);
 
     // Convert parameter choice index to FilterType

@@ -11,9 +11,9 @@ class BiquadFilter
 public:
     BiquadFilter() = default;
 
-    void setSampleRate(double sampleRate)
+    void setSampleRate(double newSampleRate)
     {
-        this->sampleRate = sampleRate;
+        this->sampleRate = newSampleRate;
         reset();
     }
 
@@ -70,7 +70,6 @@ private:
 
         case FilterType::LowShelf:
         {
-            double S = 1.0; // Shelf slope parameter
             double beta = std::sqrt(A) / Q;
 
             b0_temp = A * ((A + 1.0) - (A - 1.0) * cos_omega + beta * sin_omega);
@@ -84,7 +83,6 @@ private:
 
         case FilterType::HighShelf:
         {
-            double S = 1.0; // Shelf slope parameter
             double beta = std::sqrt(A) / Q;
 
             b0_temp = A * ((A + 1.0) + (A - 1.0) * cos_omega + beta * sin_omega);

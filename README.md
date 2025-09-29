@@ -1,10 +1,8 @@
 # 5-Band VST Equalizer
 
-A professional 5-band parametric equalizer VST3/AU plugin built with JUCE framework, inspired by Ableton EQ Eight and FabFilter Pro-Q.
+A 5-band parametric equalizer VST3/AU plugin built with JUCE framework, inspired by Ableton EQ Eight and FabFilter Pro-Q.
 
 ## ✅ Current Features (September 2025)
-
-**🎉 MAJOR MILESTONE: Full Parametric EQ Functionality Complete! 🎉**
 
 - **✅ Complete 4-Parameter Control**: Each band has Gain (-20dB to +20dB), Frequency (20Hz-20kHz), Q (0.1-20), and Filter Type selection
 - **✅ Smart Band Restrictions with Filter Type Selection**:

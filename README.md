@@ -1,127 +1,154 @@
-# 5-Band VST Equalizer
+# 5-Band Parametric Equalizer
 
-A 5-band parametric equalizer VST3/AU plugin built with JUCE framework, inspired by Ableton EQ Eight and FabFilter Pro-Q.
+A five-band parametric equalizer plugin built with C++, JUCE, and CMake. The project demonstrates practical audio DSP, real-time-safe C++ programming, host parameter automation, and maintainable plugin architecture.
 
-## ✅ Current Features (September 2025)
+## Current release scope
 
-- **✅ Complete 4-Parameter Control**: Each band has Gain (-20dB to +20dB), Frequency (20Hz-20kHz), Q (0.1-20), and Filter Type selection
-- **✅ Smart Band Restrictions with Filter Type Selection**:
-  - **Band 1 (Low)**: Low Cut, Low Shelf filters only
-  - **Bands 2, 3, 4 (Mid)**: Peak, Low Shelf, High Shelf options
-  - **Band 5 (High)**: High Cut, High Shelf filters only
-- **✅ Professional GUI**: Color-coded controls (🟠 Gain, 🔵 Frequency, 🟡 Q, 🔽 Type) with intuitive layout
-- **✅ Real-time DSP Processing**: Professional biquad filter implementation with instant parameter updates
-- **✅ Toggle Bypass**: A/B comparison functionality with visual state indication
-- **✅ Full DAW Integration**: Complete parameter automation support via AudioProcessorValueTreeState
-- **✅ Professional Development**: VS Code + MSBuild workflow with proper version control
+The supported Windows targets are:
 
-**🚀 Status: Rivals commercial parametric EQs in core functionality**
+- Standalone application for local audio testing.
+- VST3 plugin for DAW use.
 
-## 🚧 Next Development Phase
+AU and AAX are not part of the current release. They are not claimed or tested.
 
-- Professional visual styling (EQ Eight/Pro-Q inspired design)
-- Interactive frequency response curve visualization
-- Real-time spectrum analyzer display
-- Preset management system
-- VST3 plugin format for DAW integration
+## Features
 
-## Technical Stack
+- Five serial biquad EQ bands.
+- Gain, frequency, Q, and filter-type controls for every band.
+- Band-specific filter restrictions:
+  - Band 1: low cut and low shelf.
+  - Bands 2-4: peak, low shelf, and high shelf.
+  - Band 5: high cut and high shelf.
+- Smoothed parameter changes for audible controls.
+- APVTS-based host automation and state recall.
+- Mono and stereo processing paths.
+- Smoothed output gain.
+- Click-resistant bypass transition.
+- Logarithmic combined frequency-response display.
+- Automated tests for filter restrictions and coefficient behavior.
 
-- **Framework**: JUCE 7.x
-- **Language**: C++
-- **Plugin Formats**: VST3, AU, AAX
-- **DSP**: Biquad filters with smooth parameter changes
-- **GUI**: Custom OpenGL-accelerated interface
+## Project status
 
-## Project Structure
+The source-controlled CMake build has been added and successfully compiled with the available Visual Studio 2022/MSVC toolchain and JUCE 8.0.10 installation. Release Standalone and VST3 targets build successfully, the VST3 bundle contains generated metadata, and the DSP test target passes under CTest. The Standalone application has also been manually inspected.
 
-```
+Formal DAW validation, screenshots, and final portfolio evidence remain pending until they are performed and recorded with a host version and test date.
+
+## Repository structure
+
+```text
 5-band-vst-equalizer/
-├── 5BandEQ/
-│   ├── Source/
-│   │   ├── PluginProcessor.h/cpp      # ✅ Main audio processing engine
-│   │   ├── PluginEditor.h/cpp         # ✅ Parametric GUI interface
-│   │   ├── DSP/
-│   │   │   ├── FilterTypes.h          # ✅ Filter type enums and band restrictions
-│   │   │   ├── BiquadFilter.h         # ✅ Professional biquad filter DSP
-│   │   │   └── EQBand.h               # ✅ Individual EQ band processing
-│   │   └── Utils/
-│   │       ├── Parameters.h           # ✅ Complete parameter system with APVTS
-│   │       └── Constants.h            # ✅ Audio constants and frequency defaults
-│   └── Builds/VisualStudio2022/       # ✅ Working build system
-├── .vscode/                           # ✅ VS Code integration with tasks
-├── IMPLEMENTATION.md                  # ✅ Detailed technical documentation
-└── README.md                          # This file
+├── CMakeLists.txt
+├── CMakePresets.json
+├── LICENSE
+├── README.md
+├── IMPLEMENTATION.md
+├── docs/
+│   ├── BUILDING.md
+│   ├── DSP.md
+│   ├── TESTING.md
+│   └── DEVELOPMENT_PLAN.md
+├── Tests/
+│   └── DspTests.cpp
+└── 5BandEQ/Source/
+    ├── PluginProcessor.h/.cpp
+    ├── PluginEditor.h/.cpp
+    ├── DSP/
+    │   ├── BiquadFilter.h/.cpp
+    │   ├── EQBand.h/.cpp
+    │   └── FilterTypes.h
+    ├── GUI/
+    │   └── FrequencyResponseDisplay.h/.cpp
+    └── Utils/
+        ├── Constants.h
+        └── Parameters.h
 ```
 
-## Screenshots
+Generated build folders, JUCE wrappers, IDE state, binaries, and intermediate files are intentionally not tracked.
 
-### Current Interface (v0.7)
+## Build requirements
 
-- **5-Band Layout**: Each band has dedicated Gain (vertical slider), Frequency and Q (rotary knobs)
-- **Color-Coded Controls**: Intuitive orange/cyan/yellow color scheme
-- **Real-time Updates**: Live parameter changes with smooth DSP processing
-- **Professional Toggle Bypass**: A/B comparison functionality
+- Windows 10 or later.
+- Visual Studio 2022 with Desktop development with C++ or Visual Studio 2026 with the equivalent C++ workload.
+- CMake 3.24 or later.
+- JUCE 8.0.10 or a compatible JUCE 8 installation.
+- Git.
 
-_Note: GUI screenshots will be added as interface design progresses_
+The build expects JUCE at `C:/JUCE` by default. Override it when configuring if necessary.
 
-## Build Instructions
+## Build with Visual Studio
 
-### Prerequisites
+Open the repository folder in Visual Studio. Select the appropriate CMake preset and build one of these targets:
 
-- **JUCE Framework 7.x** (configured and working)
-- **Visual Studio 2022** (Windows) with C++ development tools
-- **Git** for version control
+- `FiveBandEQ_Standalone`
+- `FiveBandEQ_VST3`
+- `FiveBandEQ_Tests`
 
-### Quick Start
+The project includes presets for Visual Studio 2026 and a compatibility preset for the currently installed Visual Studio 2022 generator.
+
+## Build from PowerShell
+
+For Visual Studio 2022 compatibility:
 
 ```powershell
-# Clone the repository
-git clone https://github.com/santiago-pelaez/5-band-vst-equalizer.git
-cd 5-band-vst-equalizer
-
-# Build using VS Code tasks (recommended)
-# 1. Open in VS Code
-# 2. Run task: "Build 5BandEQ (Release)"
-# 3. Launch: "Standalone Plugin\5BandEQ.exe"
-
-# Or build with MSBuild directly
-& 'C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe' 5BandEQ\Builds\VisualStudio2022\5BandEQ.sln /p:Configuration=Release /p:Platform=x64
+cmake --preset windows-vs2022
+cmake --build build/windows-vs2022 --config Release --target FiveBandEQ_Standalone FiveBandEQ_VST3 FiveBandEQ_Tests
 ```
 
-### Output Formats
+For Visual Studio 2026:
 
-- **✅ Standalone Application**: For testing and development
-- **🚧 VST3 Plugin**: Coming soon for DAW integration
-- **🚧 AU Plugin**: macOS support planned
+```powershell
+cmake --preset windows-release
+cmake --build build/windows-release --config Release --target FiveBandEQ_Standalone FiveBandEQ_VST3 FiveBandEQ_Tests
+```
 
-## Development Progress
+To use another JUCE location:
 
-### ✅ Phase 1: Core DSP (Completed)
+```powershell
+cmake -S . -B build/custom -G "Visual Studio 18 2026" -A x64 -DJUCE_DIR="D:/libraries/JUCE"
+```
 
-- [x] Professional biquad filter implementation
-- [x] 5-band parametric EQ with band restrictions
-- [x] Real-time parameter processing
-- [x] Complete APVTS parameter system
-- [x] Build system integration
+## Output and installation
 
-### 🚧 Phase 2: GUI Development (70% Complete)
+The generated Release artifacts are placed below:
 
-- [x] Parametric interface with gain/frequency/Q controls
-- [x] Color-coded professional layout
-- [x] Real-time parameter binding and updates
-- [x] Toggle bypass functionality
-- [ ] Filter type selectors per band
-- [ ] Professional visual styling (EQ Eight inspired)
+```text
+build/<preset>/FiveBandEQ_artefacts/Release/Standalone/5-Band EQ.exe
+build/<preset>/FiveBandEQ_artefacts/Release/VST3/5-Band EQ.vst3
+```
 
-### 📋 Phase 3: Advanced Features (Planned)
+For local DAW testing, copy the VST3 bundle to:
 
-- [ ] Interactive frequency response curve
-- [ ] Real-time spectrum analyzer
-- [ ] Preset management system
-- [ ] VST3/AU plugin formats
-- [ ] Professional visual design
+```text
+C:\Program Files\Common Files\VST3\
+```
+
+Do not commit built plugin bundles to Git.
+
+## Testing
+
+Run the focused DSP test executable through the selected build target. The tests currently cover coefficient finiteness, neutral peak behavior, and band filter restrictions.
+
+The intended manual host-validation target is REAPER. The validation checklist is in [`docs/TESTING.md`](docs/TESTING.md). DAW compatibility is not claimed until that checklist has been completed.
+
+## DSP overview
+
+Each band uses a stereo pair of Direct Form II Transposed biquad filters. Parameter targets are smoothed over a short interval to reduce clicks during automation and manual control changes. Coefficients are updated from audio-owned state, while APVTS remains the host-facing parameter source.
+
+The response display calculates the combined magnitude response using the same filter coefficient model. It runs on the message thread and is not part of the audio callback.
+
+More detail is available in [`docs/DSP.md`](docs/DSP.md) and [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
+
+## Known limitations and next steps
+
+- REAPER validation and screenshots are still pending.
+- There is no spectrum analyzer.
+- There is no preset browser or factory-preset system.
+- There is no installer or code signing.
+- AU and AAX are not supported by this Windows release.
+- The project currently depends on a locally installed JUCE tree rather than vendoring JUCE.
+
+The next high-value work is Release verification, host testing, screenshots, and measured documentation—not adding a large feature set.
 
 ## License
 
-Private repository - All rights reserved.
+The project source is released under the MIT License. JUCE remains subject to its own license terms.

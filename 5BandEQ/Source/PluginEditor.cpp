@@ -275,7 +275,12 @@ void FiveBandEQProcessorEditor::updateFrequencyResponse()
             actualType = availableTypes[filterType];
         }
 
-        // Update the frequency response display with band parameters
-        frequencyResponseDisplay.setBandParameters(i, freq, gain, q, static_cast<int>(actualType));
+        const juce::String enabledParameterID = "band" + juce::String(i + 1) + "_enabled";
+        const auto *enabledParameter = audioProcessor.getAPVTS().getRawParameterValue(enabledParameterID);
+        const bool enabled = enabledParameter != nullptr && enabledParameter->load() > 0.5f;
+
+        // Update the frequency response display with band parameters.
+        frequencyResponseDisplay.setBandParameters(i, freq, gain, q,
+                                                    static_cast<int>(actualType), enabled);
     }
 }

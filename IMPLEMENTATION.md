@@ -10,7 +10,7 @@ The plugin is split into host integration, DSP, parameter definitions, and UI co
 
 1. The host or UI changes an APVTS parameter.
 2. The APVTS listener marks synchronization as pending.
-3. At the start of the next audio block, the processor reads the atomic raw parameter values.
+3. At construction time, the processor caches raw parameter pointers. At the start of the next audio block, it reads those atomic values without constructing parameter-ID strings.
 4. Audio-owned band targets and smoothers are updated.
 5. The audio callback processes samples without taking a lock or allocating memory.
 
@@ -24,7 +24,7 @@ Frequency, gain, Q, and coefficient inputs are bounded before coefficient calcul
 
 ## Real-time constraints
 
-The audio callback is designed to avoid dynamic allocation, mutexes, file I/O, logging, GUI calls, and response-curve calculations. The response display performs its calculations on the message thread.
+The audio callback is designed to avoid dynamic allocation, mutexes, file I/O, logging, GUI calls, and response-curve calculations. The response display performs its calculations on the message thread using the shared `BiquadFilter` response model.
 
 ## Bypass behavior
 

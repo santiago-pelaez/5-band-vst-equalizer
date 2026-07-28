@@ -2,6 +2,7 @@
 #include <juce_core/juce_core.h>
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include "FilterTypes.h"
 
 /**
@@ -15,15 +16,26 @@ public:
 
     void setSampleRate(double newSampleRate)
     {
-        this->sampleRate = std::max(newSampleRate, 1.0);
+        if (! std::isfinite(newSampleRate) || newSampleRate <= 1.0)
+        {
+            this->sampleRate = 44100.0;
+            reset();
+            return;
+        }
+
+        this->sampleRate = newSampleRate;
         reset();
     }
 
     void setCoefficients(FilterType type, double frequency, double gain, double Q)
     {
-        const double safeFrequency = juce::jlimit(1.0, sampleRate * 0.49, frequency);
-        const double safeGain = juce::jlimit(-60.0, 60.0, gain);
-        const double safeQ = juce::jlimit(0.05, 100.0, Q);
+        const double finiteFrequency = std::isfinite(frequency) ? frequency : 1000.0;
+        const double finiteGain = std::isfinite(gain) ? gain : 0.0;
+        const double finiteQ = std::isfinite(Q) ? Q : 1.0;
+        const double maximumFrequency = std::max(1.0, sampleRate * 0.49);
+        const double safeFrequency = std::clamp(finiteFrequency, 1.0, maximumFrequency);
+        const double safeGain = std::clamp(finiteGain, -60.0, 60.0);
+        const double safeQ = std::clamp(finiteQ, 0.05, 100.0);
 
         calculateCoefficients(type, safeFrequency, safeGain, safeQ);
     }
@@ -38,6 +50,30 @@ public:
     Coefficients getCoefficients() const
     {
         return {b0, b1, b2, a1, a2};
+    }
+
+    double getMagnitudeResponseAtFrequency(double frequency) const
+    {
+        if (! std::isfinite(frequency) || frequency < 0.0)
+            return 1.0;
+
+        const double safeFrequency = std::clamp(frequency, 0.0, sampleRate * 0.5);
+        const double angularFrequency = juce::MathConstants<double>::twoPi * safeFrequency / sampleRate;
+        const std::complex<double> z = std::exp(std::complex<double>(0.0, -angularFrequency));
+        const std::complex<double> zSquared = z * z;
+        const std::complex<double> numerator = static_cast<double>(b0)
+                                             + static_cast<double>(b1) * z
+                                             + static_cast<double>(b2) * zSquared;
+        const std::complex<double> denominator = 1.0
+                                               + static_cast<double>(a1) * z
+                                               + static_cast<double>(a2) * zSquared;
+        const double denominatorMagnitude = std::abs(denominator);
+
+        if (! std::isfinite(denominatorMagnitude) || denominatorMagnitude < 1.0e-12)
+            return 0.0;
+
+        const double magnitude = std::abs(numerator / denominator);
+        return std::isfinite(magnitude) ? magnitude : 0.0;
     }
 
     float processSample(float input)
@@ -55,6 +91,25 @@ public:
     }
 
 private:
+    void setPassThroughCoefficients()
+    {
+        b0 = 1.0f;
+        b1 = 0.0f;
+        b2 = 0.0f;
+        a1 = 0.0f;
+        a2 = 0.0f;
+    }
+
+    bool areFinite(double candidateB0, double candidateB1, double candidateB2,
+                   double candidateA1, double candidateA2) const
+    {
+        return std::isfinite(candidateB0)
+            && std::isfinite(candidateB1)
+            && std::isfinite(candidateB2)
+            && std::isfinite(candidateA1)
+            && std::isfinite(candidateA2);
+    }
+
     double sampleRate = 44100.0;
 
     // Filter coefficients
@@ -143,11 +198,30 @@ private:
             break;
         }
 
-        // Normalize coefficients
-        b0 = static_cast<float>(b0_temp / a0);
-        b1 = static_cast<float>(b1_temp / a0);
-        b2 = static_cast<float>(b2_temp / a0);
-        a1 = static_cast<float>(a1_temp / a0);
-        a2 = static_cast<float>(a2_temp / a0);
+        if (! std::isfinite(a0) || std::abs(a0) < 1.0e-12)
+        {
+            setPassThroughCoefficients();
+            return;
+        }
+
+        // Normalize coefficients and reject invalid results before they reach
+        // the audio state variables.
+        const double normalizedB0 = b0_temp / a0;
+        const double normalizedB1 = b1_temp / a0;
+        const double normalizedB2 = b2_temp / a0;
+        const double normalizedA1 = a1_temp / a0;
+        const double normalizedA2 = a2_temp / a0;
+
+        if (! areFinite(normalizedB0, normalizedB1, normalizedB2, normalizedA1, normalizedA2))
+        {
+            setPassThroughCoefficients();
+            return;
+        }
+
+        b0 = static_cast<float>(normalizedB0);
+        b1 = static_cast<float>(normalizedB1);
+        b2 = static_cast<float>(normalizedB2);
+        a1 = static_cast<float>(normalizedA1);
+        a2 = static_cast<float>(normalizedA2);
     }
 };

@@ -1,281 +1,235 @@
 #include "FrequencyResponseDisplay.h"
 #include "../DSP/FilterTypes.h"
-#include "../DSP/BiquadFilter.h"
+
+#include <algorithm>
+#include <array>
 #include <cmath>
-#include <complex>
 
 FrequencyResponseDisplay::FrequencyResponseDisplay()
 {
-    // Initialize frequency points logarithmically
     calculateFrequencyPoints();
-
-    // Initialize all response data to 0dB (no change)
     responseData.fill(0.0f);
 
-    // Set up default band parameters
-    for (int i = 0; i < NUM_BANDS; ++i)
+    for (int bandIndex = 0; bandIndex < NUM_BANDS; ++bandIndex)
     {
-        bandParams[i].frequency = 100.0f * std::pow(10.0f, i * 0.6f); // Spread across spectrum
-        bandParams[i].gain = 0.0f;
-        bandParams[i].q = 0.7f;
-        bandParams[i].filterType = static_cast<int>(FilterType::Peak);
-        bandParams[i].enabled = true;
+        bandParams[bandIndex].frequency = 100.0f * std::pow(10.0f, bandIndex * 0.6f);
+        bandParams[bandIndex].gain = 0.0f;
+        bandParams[bandIndex].q = 0.7f;
+        bandParams[bandIndex].filterType = static_cast<int>(FilterType::Peak);
+        bandParams[bandIndex].enabled = true;
     }
 }
 
+FrequencyResponseDisplay::~FrequencyResponseDisplay() = default;
+
 void FrequencyResponseDisplay::setSampleRate(double newSampleRate)
 {
-    sampleRate = newSampleRate > 1.0 ? newSampleRate : 44100.0;
+    sampleRate = std::isfinite(newSampleRate) && newSampleRate > 1.0 ? newSampleRate : 44100.0;
     updateResponse();
 }
 
-FrequencyResponseDisplay::~FrequencyResponseDisplay()
+void FrequencyResponseDisplay::paint(juce::Graphics &graphics)
 {
-}
-
-void FrequencyResponseDisplay::paint(juce::Graphics &g)
-{
-    // Professional dark background like Pro-Q
-    g.fillAll(juce::Colour::fromRGB(25, 28, 35));
-
-    // Draw grid and labels first (background elements)
-    drawGrid(g);
-    drawFrequencyLabels(g);
-    drawGainLabels(g);
-
-    // Draw the frequency response curve on top
-    drawResponseCurve(g);
+    graphics.fillAll(juce::Colour::fromRGB(25, 28, 35));
+    drawGrid(graphics);
+    drawFrequencyLabels(graphics);
+    drawGainLabels(graphics);
+    drawResponseCurve(graphics);
 }
 
 void FrequencyResponseDisplay::resized()
 {
-    // Recalculate curve when component size changes
     updateResponse();
 }
 
 void FrequencyResponseDisplay::updateResponse()
 {
     calculateResponseCurve();
-    repaint(); // Trigger redraw
+    repaint();
 }
 
-void FrequencyResponseDisplay::setBandParameters(int bandIndex, float freq, float gain, float q, int filterType)
+void FrequencyResponseDisplay::setBandParameters(int bandIndex,
+                                                 float frequency,
+                                                 float gain,
+                                                 float q,
+                                                 int filterType,
+                                                 bool enabled)
 {
-    if (bandIndex >= 0 && bandIndex < NUM_BANDS)
-    {
-        bandParams[bandIndex].frequency = freq;
-        bandParams[bandIndex].gain = gain;
-        bandParams[bandIndex].q = q;
-        bandParams[bandIndex].filterType = filterType;
+    if (bandIndex < 0 || bandIndex >= NUM_BANDS)
+        return;
 
-        // Update the display in real-time
-        updateResponse();
-    }
+    bandParams[bandIndex].frequency = frequency;
+    bandParams[bandIndex].gain = gain;
+    bandParams[bandIndex].q = q;
+    bandParams[bandIndex].filterType = filterType;
+    bandParams[bandIndex].enabled = enabled;
+    updateResponse();
 }
 
-//==============================================================================
-// Coordinate transformation functions (Critical for professional visualization)
-
-float FrequencyResponseDisplay::frequencyToX(float freq, float width) const
+float FrequencyResponseDisplay::frequencyToX(float frequency, float width) const
 {
-    // Logarithmic scaling - industry standard for audio
-    float logFreq = std::log10(freq);
-    float logMin = std::log10(MIN_FREQUENCY);
-    float logMax = std::log10(MAX_FREQUENCY);
-
-    return (logFreq - logMin) / (logMax - logMin) * width;
+    const float logFrequency = std::log10(frequency);
+    const float logMinimum = std::log10(MIN_FREQUENCY);
+    const float logMaximum = std::log10(MAX_FREQUENCY);
+    return (logFrequency - logMinimum) / (logMaximum - logMinimum) * width;
 }
 
 float FrequencyResponseDisplay::gainToY(float gainDB, float height) const
 {
-    // Linear dB scaling with 0dB at center
-    float normalizedGain = (gainDB - MIN_GAIN_DB) / (MAX_GAIN_DB - MIN_GAIN_DB);
-    return height * (1.0f - normalizedGain); // Flip Y axis (0dB at center)
+    const float normalizedGain = (gainDB - MIN_GAIN_DB) / (MAX_GAIN_DB - MIN_GAIN_DB);
+    return height * (1.0f - normalizedGain);
 }
 
 float FrequencyResponseDisplay::xToFrequency(float x, float width) const
 {
-    float logMin = std::log10(MIN_FREQUENCY);
-    float logMax = std::log10(MAX_FREQUENCY);
-    float logFreq = logMin + (x / width) * (logMax - logMin);
+    if (width <= 0.0f)
+        return MIN_FREQUENCY;
 
-    return std::pow(10.0f, logFreq);
+    const float logMinimum = std::log10(MIN_FREQUENCY);
+    const float logMaximum = std::log10(MAX_FREQUENCY);
+    const float logFrequency = logMinimum + (x / width) * (logMaximum - logMinimum);
+    return std::pow(10.0f, logFrequency);
 }
 
 float FrequencyResponseDisplay::yToGain(float y, float height) const
 {
-    float normalizedY = 1.0f - (y / height);
+    if (height <= 0.0f)
+        return 0.0f;
+
+    const float normalizedY = 1.0f - (y / height);
     return MIN_GAIN_DB + normalizedY * (MAX_GAIN_DB - MIN_GAIN_DB);
 }
 
-//==============================================================================
-// DSP Mathematics - The Heart of EQ Visualization
-
 void FrequencyResponseDisplay::calculateFrequencyPoints()
 {
-    // Create logarithmically spaced frequency points
-    float logMin = std::log10(MIN_FREQUENCY);
-    float logMax = std::log10(MAX_FREQUENCY);
+    const float logMinimum = std::log10(MIN_FREQUENCY);
+    const float logMaximum = std::log10(MAX_FREQUENCY);
 
-    for (int i = 0; i < RESPONSE_CURVE_POINTS; ++i)
+    for (int pointIndex = 0; pointIndex < RESPONSE_CURVE_POINTS; ++pointIndex)
     {
-        float ratio = static_cast<float>(i) / (RESPONSE_CURVE_POINTS - 1);
-        float logFreq = logMin + ratio * (logMax - logMin);
-        frequencyPoints[i] = std::pow(10.0f, logFreq);
+        const float ratio = static_cast<float>(pointIndex) / static_cast<float>(RESPONSE_CURVE_POINTS - 1);
+        const float logFrequency = logMinimum + ratio * (logMaximum - logMinimum);
+        frequencyPoints[pointIndex] = std::pow(10.0f, logFrequency);
     }
 }
 
 void FrequencyResponseDisplay::calculateResponseCurve()
 {
-    // Calculate combined response from all active bands
-    for (int i = 0; i < RESPONSE_CURVE_POINTS; ++i)
+    for (int pointIndex = 0; pointIndex < RESPONSE_CURVE_POINTS; ++pointIndex)
     {
-        std::complex<double> totalResponse(1.0, 0.0); // Start with unity gain
+        double totalMagnitude = 1.0;
 
-        // Multiply responses from all bands (addition in log domain)
         for (int bandIndex = 0; bandIndex < NUM_BANDS; ++bandIndex)
         {
-            if (bandParams[bandIndex].enabled
-                && bandParams[bandIndex].filterType != static_cast<int>(FilterType::Disabled))
-            {
-                auto bandResponse = calculateBiquadResponse(bandParams[bandIndex], frequencyPoints[i]);
-                totalResponse *= bandResponse;
-            }
+            const auto &band = bandParams[bandIndex];
+
+            if (! band.enabled)
+                continue;
+
+            if (band.filterType == static_cast<int>(FilterType::Disabled))
+                continue;
+
+            const double bandMagnitude = calculateBiquadResponse(band, frequencyPoints[pointIndex]);
+            totalMagnitude *= bandMagnitude;
         }
 
-        // Convert to dB
-        double magnitude = std::abs(totalResponse);
-        responseData[i] = static_cast<float>(20.0 * std::log10(std::max(magnitude, 1e-10))); // Avoid log(0)
+        responseData[pointIndex] = static_cast<float>(
+            20.0 * std::log10(std::max(totalMagnitude, 1.0e-10)));
     }
 }
 
-std::complex<double> FrequencyResponseDisplay::calculateBiquadResponse(const BandParams &params, float freq) const
+double FrequencyResponseDisplay::calculateBiquadResponse(const BandParams &parameters, float frequency) const
 {
-    // This is where the real DSP magic happens!
-    // We're calculating H(jω) = (b₀ + b₁z⁻¹ + b₂z⁻²) / (1 + a₁z⁻¹ + a₂z⁻²)
-
-    // First, we need to create a biquad filter with these parameters
-    // and get its coefficients
-    BiquadFilter tempFilter;
-
-    // Convert our filter type enum to the filter type the BiquadFilter expects
-    FilterType filterType = static_cast<FilterType>(params.filterType);
-
-    // Calculate the biquad coefficients for this band
-    tempFilter.setSampleRate(sampleRate);
-    tempFilter.setCoefficients(filterType, params.frequency, params.gain, params.q);
-
-    // Get the coefficients
-    auto coeffs = tempFilter.getCoefficients();
-
-    // Calculate the complex frequency response
-    double omega = juce::MathConstants<double>::twoPi * freq / sampleRate;
-    std::complex<double> z = std::exp(std::complex<double>(0, -omega)); // e^(-jω)
-    std::complex<double> z2 = z * z;                                    // e^(-j2ω)
-
-    // Numerator: b₀ + b₁z⁻¹ + b₂z⁻²
-    std::complex<double> numerator = std::complex<double>(coeffs.b0) + std::complex<double>(coeffs.b1) * z + std::complex<double>(coeffs.b2) * z2;
-
-    // Denominator: 1 + a₁z⁻¹ + a₂z⁻²
-    std::complex<double> denominator = std::complex<double>(1.0) + std::complex<double>(coeffs.a1) * z + std::complex<double>(coeffs.a2) * z2;
-
-    return numerator / denominator;
+    BiquadFilter temporaryFilter;
+    temporaryFilter.setSampleRate(sampleRate);
+    temporaryFilter.setCoefficients(static_cast<FilterType>(parameters.filterType),
+                                     parameters.frequency,
+                                     parameters.gain,
+                                     parameters.q);
+    return temporaryFilter.getMagnitudeResponseAtFrequency(frequency);
 }
 
-//==============================================================================
-// Professional Graphics Rendering
-
-void FrequencyResponseDisplay::drawGrid(juce::Graphics &g)
+void FrequencyResponseDisplay::drawGrid(juce::Graphics &graphics)
 {
-    auto bounds = getLocalBounds();
-    g.setColour(juce::Colour::fromRGB(45, 50, 60)); // Subtle grid lines
+    const auto bounds = getLocalBounds();
+    const float width = static_cast<float>(bounds.getWidth());
+    const float height = static_cast<float>(bounds.getHeight());
 
-    // Vertical frequency grid lines (octaves)
-    std::array<float, 10> freqLines = {20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000};
+    graphics.setColour(juce::Colour::fromRGB(45, 50, 60));
 
-    for (auto freq : freqLines)
+    const std::array<float, 10> frequencyLines = {20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000};
+    for (const float frequency : frequencyLines)
     {
-        if (freq >= MIN_FREQUENCY && freq <= MAX_FREQUENCY)
-        {
-            const float componentWidth = static_cast<float>(bounds.getWidth());
-            float x = frequencyToX(freq, componentWidth);
-            g.drawVerticalLine(static_cast<int>(x), 0.0f, static_cast<float>(bounds.getHeight()));
-        }
+        const int x = static_cast<int>(frequencyToX(frequency, width));
+        graphics.drawVerticalLine(x, 0.0f, height);
     }
 
-    // Horizontal gain grid lines
-    std::array<float, 9> gainLines = {-20, -15, -10, -5, 0, 5, 10, 15, 20};
-
-    for (auto gain : gainLines)
+    const std::array<float, 9> gainLines = {-20, -15, -10, -5, 0, 5, 10, 15, 20};
+    for (const float gain : gainLines)
     {
-        const float componentHeight = static_cast<float>(bounds.getHeight());
-        float y = gainToY(gain, componentHeight);
-        g.setColour(gain == 0.0f ? juce::Colour::fromRGB(70, 75, 85) : juce::Colour::fromRGB(45, 50, 60));
-        g.drawHorizontalLine(static_cast<int>(y), 0.0f, static_cast<float>(bounds.getWidth()));
+        graphics.setColour(gain == 0.0f
+                               ? juce::Colour::fromRGB(70, 75, 85)
+                               : juce::Colour::fromRGB(45, 50, 60));
+        graphics.drawHorizontalLine(static_cast<int>(gainToY(gain, height)), 0.0f, width);
     }
 }
 
-void FrequencyResponseDisplay::drawFrequencyLabels(juce::Graphics &g)
+void FrequencyResponseDisplay::drawFrequencyLabels(juce::Graphics &graphics)
 {
-    auto bounds = getLocalBounds();
-    g.setColour(juce::Colours::lightgrey);
-    g.setFont(10.0f);
+    const auto bounds = getLocalBounds();
+    const float width = static_cast<float>(bounds.getWidth());
+    const std::array<float, 6> frequencies = {20, 100, 1000, 5000, 10000, 20000};
+    const std::array<juce::String, 6> labels = {"20", "100", "1K", "5K", "10K", "20K"};
 
-    std::array<float, 6> labelFreqs = {20, 100, 1000, 5000, 10000, 20000};
-    std::array<juce::String, 6> labels = {"20", "100", "1K", "5K", "10K", "20K"};
+    graphics.setColour(juce::Colours::lightgrey);
+    graphics.setFont(10.0f);
 
-    for (size_t i = 0; i < labelFreqs.size() && i < labels.size(); ++i)
+    for (size_t index = 0; index < frequencies.size(); ++index)
     {
-        const float componentWidth = static_cast<float>(bounds.getWidth());
-        float x = frequencyToX(labelFreqs[i], componentWidth);
-        g.drawText(labels[i], static_cast<int>(x - 15), bounds.getHeight() - 15, 30, 12, juce::Justification::centred);
+        const int x = static_cast<int>(frequencyToX(frequencies[index], width));
+        graphics.drawText(labels[index], x - 15, bounds.getHeight() - 15, 30, 12,
+                          juce::Justification::centred);
     }
 }
 
-void FrequencyResponseDisplay::drawGainLabels(juce::Graphics &g)
+void FrequencyResponseDisplay::drawGainLabels(juce::Graphics &graphics)
 {
-    auto bounds = getLocalBounds();
-    g.setColour(juce::Colours::lightgrey);
-    g.setFont(10.0f);
+    const auto bounds = getLocalBounds();
+    const float height = static_cast<float>(bounds.getHeight());
+    const std::array<float, 5> gains = {-20, -10, 0, 10, 20};
 
-    std::array<float, 5> labelGains = {-20, -10, 0, 10, 20};
+    graphics.setColour(juce::Colours::lightgrey);
+    graphics.setFont(10.0f);
 
-    for (auto gain : labelGains)
+    for (const float gain : gains)
     {
-        const float componentHeight = static_cast<float>(bounds.getHeight());
-        float y = gainToY(gain, componentHeight);
-        juce::String label = juce::String(static_cast<int>(gain)) + "dB";
-        g.drawText(label, 5, static_cast<int>(y - 6), 40, 12, juce::Justification::left);
+        const int y = static_cast<int>(gainToY(gain, height));
+        graphics.drawText(juce::String(static_cast<int>(gain)) + "dB", 5, y - 6, 40, 12,
+                          juce::Justification::left);
     }
 }
 
-void FrequencyResponseDisplay::drawResponseCurve(juce::Graphics &g)
+void FrequencyResponseDisplay::drawResponseCurve(juce::Graphics &graphics)
 {
-    auto bounds = getLocalBounds();
-
-    // Create the curve path
+    const auto bounds = getLocalBounds();
+    const float width = static_cast<float>(bounds.getWidth());
+    const float height = static_cast<float>(bounds.getHeight());
     juce::Path curvePath;
-    bool firstPoint = true;
 
-    for (int i = 0; i < RESPONSE_CURVE_POINTS; ++i)
+    for (int pointIndex = 0; pointIndex < RESPONSE_CURVE_POINTS; ++pointIndex)
     {
-        const float componentWidth = static_cast<float>(bounds.getWidth());
-        const float componentHeight = static_cast<float>(bounds.getHeight());
-        float x = frequencyToX(frequencyPoints[i], componentWidth);
-        float y = gainToY(responseData[i], componentHeight);
+        const float x = frequencyToX(frequencyPoints[pointIndex], width);
+        const float y = gainToY(responseData[pointIndex], height);
 
-        if (firstPoint)
+        if (pointIndex == 0)
         {
             curvePath.startNewSubPath(x, y);
-            firstPoint = false;
+            continue;
         }
-        else
-        {
-            curvePath.lineTo(x, y);
-        }
+
+        curvePath.lineTo(x, y);
     }
 
-    // Draw the curve with professional styling
-    g.setColour(juce::Colour::fromRGB(255, 140, 0)); // Professional orange like Pro-Q
-    g.strokePath(curvePath, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved));
+    graphics.setColour(juce::Colour::fromRGB(255, 140, 0));
+    graphics.strokePath(curvePath, juce::PathStrokeType(2.0f, juce::PathStrokeType::curved));
 }

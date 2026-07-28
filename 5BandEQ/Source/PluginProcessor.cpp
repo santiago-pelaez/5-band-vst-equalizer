@@ -14,6 +14,23 @@ FiveBandEQProcessor::FiveBandEQProcessor()
         eqBands[i] = std::make_unique<EQBand>(static_cast<BandPosition>(i));
     }
 
+    // Cache raw parameter pointers once during construction. The audio thread
+    // can then synchronize values without constructing parameter-ID strings.
+    for (int band = 0; band < EQConstants::NUM_BANDS; ++band)
+    {
+        const juce::String prefix = "band" + juce::String(band + 1);
+        auto &pointers = bandParameterPointers[band];
+
+        pointers.type = apvts.getRawParameterValue(prefix + "_type");
+        pointers.frequency = apvts.getRawParameterValue(prefix + "_freq");
+        pointers.gain = apvts.getRawParameterValue(prefix + "_gain");
+        pointers.q = apvts.getRawParameterValue(prefix + "_q");
+        pointers.enabled = apvts.getRawParameterValue(prefix + "_enabled");
+    }
+
+    outputGainParameter = apvts.getRawParameterValue("output_gain");
+    bypassParameter = apvts.getRawParameterValue("bypass");
+
     // Parameter listeners only mark a pending synchronization. DSP state is
     // updated by the audio thread at the beginning of the next audio block.
     for (int band = 0; band < EQConstants::NUM_BANDS; ++band)
@@ -111,11 +128,10 @@ void FiveBandEQProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
     // Set up output gain smoothing
     outputGain.reset(sampleRate, 0.01); // 10ms smoothing
-    outputGain.setCurrentAndTargetValue(juce::Decibels::decibelsToGain(
-        apvts.getRawParameterValue("output_gain")->load()));
+    outputGain.setCurrentAndTargetValue(juce::Decibels::decibelsToGain(outputGainParameter->load()));
 
     bypassMix.reset(sampleRate, 0.01);
-    bypassMix.setCurrentAndTargetValue(apvts.getRawParameterValue("bypass")->load() > 0.5f ? 1.0f : 0.0f);
+    bypassMix.setCurrentAndTargetValue(bypassParameter->load() > 0.5f ? 1.0f : 0.0f);
 
     parametersNeedSynchronization.store(true);
     synchronizeParametersFromHost();
@@ -240,10 +256,10 @@ void FiveBandEQProcessor::synchronizeParametersFromHost()
     for (int band = 0; band < EQConstants::NUM_BANDS; ++band)
         updateBandFromParameters(band);
 
-    const float outputGainInDecibels = apvts.getRawParameterValue("output_gain")->load();
+    const float outputGainInDecibels = outputGainParameter->load();
     outputGain.setTargetValue(juce::Decibels::decibelsToGain(outputGainInDecibels));
 
-    const bool hostRequestedBypass = apvts.getRawParameterValue("bypass")->load() > 0.5f;
+    const bool hostRequestedBypass = bypassParameter->load() > 0.5f;
     bypassMix.setTargetValue(hostRequestedBypass ? 1.0f : 0.0f);
 }
 
@@ -253,19 +269,24 @@ void FiveBandEQProcessor::updateBandFromParameters(int bandIndex)
         return;
 
     auto &band = eqBands[bandIndex];
-    juce::String prefix = "band" + juce::String(bandIndex + 1);
+    const auto &parameters = bandParameterPointers[bandIndex];
 
-    // Get parameter values
-    int typeChoice = static_cast<int>(*apvts.getRawParameterValue(prefix + "_type"));
-    float freq = *apvts.getRawParameterValue(prefix + "_freq");
-    float gain = *apvts.getRawParameterValue(prefix + "_gain");
-    float q = *apvts.getRawParameterValue(prefix + "_q");
-    bool enabled = *apvts.getRawParameterValue(prefix + "_enabled") > 0.5f;
+    if (parameters.type == nullptr || parameters.frequency == nullptr
+        || parameters.gain == nullptr || parameters.q == nullptr
+        || parameters.enabled == nullptr)
+        return;
+
+    // Read only cached atomic values from the audio thread.
+    const int typeChoice = static_cast<int>(parameters.type->load());
+    const float frequency = parameters.frequency->load();
+    const float gain = parameters.gain->load();
+    const float q = parameters.q->load();
+    const bool enabled = parameters.enabled->load() > 0.5f;
 
     // Update band
     FilterType filterType = getFilterTypeFromChoice(typeChoice, static_cast<BandPosition>(bandIndex));
     band->setFilterType(filterType);
-    band->setFrequency(freq);
+    band->setFrequency(frequency);
     band->setGain(gain);
     band->setQ(q);
     band->setEnabled(enabled);
@@ -273,31 +294,41 @@ void FiveBandEQProcessor::updateBandFromParameters(int bandIndex)
 
 FilterType FiveBandEQProcessor::getFilterTypeFromChoice(int choiceIndex, BandPosition position)
 {
-    auto availableTypes = FilterTypeRestrictions::getAvailableTypes(position);
-    if (choiceIndex >= 0 && choiceIndex < static_cast<int>(availableTypes.size()))
-        return availableTypes[choiceIndex];
-    return FilterType::Disabled;
-}
+    if (choiceIndex < 0)
+        return FilterType::Disabled;
 
-void FiveBandEQProcessor::getFrequencyResponse(std::vector<double> &frequencies,
-                                               std::vector<double> &magnitudes,
-                                               int numPoints)
-{
-    // This would calculate the combined frequency response of all bands
-    // Implementation for spectrum analyzer display
-    frequencies.resize(numPoints);
-    magnitudes.resize(numPoints);
-
-    // Calculate logarithmic frequency points
-    double logMin = std::log10(EQConstants::FREQUENCY_MIN);
-    double logMax = std::log10(EQConstants::FREQUENCY_MAX);
-    double logStep = (logMax - logMin) / (numPoints - 1);
-
-    for (int i = 0; i < numPoints; ++i)
+    if (position == BandPosition::Low)
     {
-        frequencies[i] = std::pow(10.0, logMin + i * logStep);
-        magnitudes[i] = 1.0; // Would calculate combined response here
+        if (choiceIndex == 0)
+            return FilterType::LowCut;
+        if (choiceIndex == 1)
+            return FilterType::LowShelf;
+        if (choiceIndex == 2)
+            return FilterType::Disabled;
+        return FilterType::Disabled;
     }
+
+    if (position == BandPosition::High)
+    {
+        if (choiceIndex == 0)
+            return FilterType::HighCut;
+        if (choiceIndex == 1)
+            return FilterType::HighShelf;
+        if (choiceIndex == 2)
+            return FilterType::Disabled;
+        return FilterType::Disabled;
+    }
+
+    if (choiceIndex == 0)
+        return FilterType::Peak;
+    if (choiceIndex == 1)
+        return FilterType::LowShelf;
+    if (choiceIndex == 2)
+        return FilterType::HighShelf;
+    if (choiceIndex == 3)
+        return FilterType::Disabled;
+
+    return FilterType::Disabled;
 }
 
 //==============================================================================

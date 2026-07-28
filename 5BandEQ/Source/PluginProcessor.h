@@ -57,11 +57,6 @@ public:
     // Parameter access for editor
     juce::AudioProcessorValueTreeState &getAPVTS() { return apvts; }
 
-    // Get frequency response for spectrum display
-    void getFrequencyResponse(std::vector<double> &frequencies,
-                              std::vector<double> &magnitudes,
-                              int numPoints = 512);
-
 private:
     //==============================================================================
     juce::AudioProcessorValueTreeState apvts;
@@ -73,6 +68,19 @@ private:
     juce::SmoothedValue<float> outputGain;
     juce::SmoothedValue<float> bypassMix;
     std::atomic<bool> parametersNeedSynchronization{true};
+
+    struct BandParameterPointers
+    {
+        std::atomic<float> *type = nullptr;
+        std::atomic<float> *frequency = nullptr;
+        std::atomic<float> *gain = nullptr;
+        std::atomic<float> *q = nullptr;
+        std::atomic<float> *enabled = nullptr;
+    };
+
+    std::array<BandParameterPointers, EQConstants::NUM_BANDS> bandParameterPointers;
+    std::atomic<float> *outputGainParameter = nullptr;
+    std::atomic<float> *bypassParameter = nullptr;
 
     // Helper methods
     void updateBandFromParameters(int bandIndex);

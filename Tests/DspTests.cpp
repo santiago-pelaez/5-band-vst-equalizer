@@ -2,9 +2,9 @@
 #include "DSP/FilterTypes.h"
 
 #include <cmath>
-#include <complex>
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <string>
 
 namespace
@@ -82,34 +82,46 @@ namespace
         requireFiniteCoefficients(coefficients);
     }
 
-    float calculateMagnitudeAtUnitCircle(const BiquadFilter::Coefficients &coefficients, double angularFrequency)
-    {
-        const std::complex<double> z = std::exp(std::complex<double>(0.0, -angularFrequency));
-        const std::complex<double> zSquared = z * z;
-        const std::complex<double> numerator = static_cast<double>(coefficients.b0)
-                                             + static_cast<double>(coefficients.b1) * z
-                                             + static_cast<double>(coefficients.b2) * zSquared;
-        const std::complex<double> denominator = 1.0
-                                               + static_cast<double>(coefficients.a1) * z
-                                               + static_cast<double>(coefficients.a2) * zSquared;
-
-        return static_cast<float>(std::abs(numerator / denominator));
-    }
-
     void testCutFiltersRemainActiveAtZeroGain()
     {
         BiquadFilter filter;
         filter.setSampleRate(48000.0);
 
         filter.setCoefficients(FilterType::LowCut, 1000.0, 0.0, 0.707);
-        const float lowCutAtDc = calculateMagnitudeAtUnitCircle(filter.getCoefficients(), 0.0);
+        const double lowCutAtDc = filter.getMagnitudeResponseAtFrequency(0.0);
 
         filter.setCoefficients(FilterType::HighCut, 1000.0, 0.0, 0.707);
-        const float highCutAtNyquist = calculateMagnitudeAtUnitCircle(
-            filter.getCoefficients(), juce::MathConstants<double>::pi);
+        const double highCutAtNyquist = filter.getMagnitudeResponseAtFrequency(24000.0);
 
         requireCondition(lowCutAtDc < 0.01f, "low cut should attenuate DC at zero gain");
         requireCondition(highCutAtNyquist < 0.01f, "high cut should attenuate Nyquist at zero gain");
+    }
+
+    void testBoundaryInputsRemainFinite()
+    {
+        BiquadFilter filter;
+        filter.setSampleRate(std::numeric_limits<double>::quiet_NaN());
+        filter.setCoefficients(FilterType::Peak,
+                                std::numeric_limits<double>::quiet_NaN(),
+                                std::numeric_limits<double>::infinity(),
+                                0.0);
+
+        requireFiniteCoefficients(filter.getCoefficients());
+        requireCondition(std::isfinite(filter.getMagnitudeResponseAtFrequency(1000.0)),
+                         "boundary response should remain finite");
+        requireCondition(std::isfinite(filter.processSample(0.25f)),
+                         "boundary processing should remain finite");
+    }
+
+    void testSharedResponseMathShowsPeakGain()
+    {
+        BiquadFilter filter;
+        filter.setSampleRate(48000.0);
+        filter.setCoefficients(FilterType::Peak, 1000.0, 6.0, 0.707);
+
+        const double magnitudeAtCenter = filter.getMagnitudeResponseAtFrequency(1000.0);
+        requireCondition(magnitudeAtCenter > 1.5,
+                         "positive peak gain should appear in the shared response calculation");
     }
 }
 
@@ -119,6 +131,8 @@ int main()
     testBiquadCoefficients();
     testNeutralPeakIsUnity();
     testCutFiltersRemainActiveAtZeroGain();
+    testBoundaryInputsRemainFinite();
+    testSharedResponseMathShowsPeakGain();
 
     std::cout << "All DSP tests passed.\n";
     return EXIT_SUCCESS;

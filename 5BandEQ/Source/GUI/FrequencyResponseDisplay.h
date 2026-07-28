@@ -2,7 +2,6 @@
 
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "../DSP/BiquadFilter.h"
-#include <complex>
 
 /**
  * Professional frequency response visualization component
@@ -35,7 +34,7 @@ public:
      * @param q Q factor
      * @param filterType Type of filter (Peak, Shelf, Cut, etc.)
      */
-    void setBandParameters(int bandIndex, float freq, float gain, float q, int filterType);
+    void setBandParameters(int bandIndex, float freq, float gain, float q, int filterType, bool enabled);
 
     /**
      * Set sample rate for frequency response calculations
@@ -81,7 +80,7 @@ private:
     // DSP calculation functions
     void calculateFrequencyPoints();
     void calculateResponseCurve();
-    std::complex<double> calculateBiquadResponse(const BandParams &params, float freq) const;
+    double calculateBiquadResponse(const BandParams &params, float freq) const;
 
     // Drawing functions
     void drawGrid(juce::Graphics &g);

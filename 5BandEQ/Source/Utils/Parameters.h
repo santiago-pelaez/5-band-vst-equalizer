@@ -1,5 +1,5 @@
 #pragma once
-#include <JuceHeader.h>
+#include <juce_audio_processors/juce_audio_processors.h>
 #include "DSP/EQBand.h"
 #include "Utils/Constants.h"
 
@@ -106,27 +106,24 @@ public:
             params.push_back(std::make_unique<juce::AudioParameterFloat>(
                 prefix + "_freq", prefix + " Frequency",
                 juce::NormalisableRange<float>(EQConstants::FREQUENCY_MIN, EQConstants::FREQUENCY_MAX, 1.0f, 0.25f),
-                EQConstants::BAND_FREQUENCIES[bandNum], "Hz"));
+                EQConstants::BAND_FREQUENCIES[bandNum],
+                juce::AudioParameterFloatAttributes().withLabel("Hz")));
 
-            // NEUTRAL CONFIGURATION: All gains at 0dB (bypass simulation)
-            float testGainDefaults[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-            // All bands: 0dB = transparent/neutral (simulates bypass)
-            // Change these values to hear DSP processing
+            const float defaultGainInDecibels[5] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
             // Gain parameter
             params.push_back(std::make_unique<juce::AudioParameterFloat>(
                 prefix + "_gain", prefix + " Gain",
                 juce::NormalisableRange<float>(EQConstants::GAIN_MIN, EQConstants::GAIN_MAX, 0.1f),
-                testGainDefaults[bandNum], "dB"));
+                defaultGainInDecibels[bandNum],
+                juce::AudioParameterFloatAttributes().withLabel("dB")));
 
-            // Q parameter - using higher Q for dramatic sharp peaks/cuts
-            float testQDefaults[5] = {0.7f, 8.0f, 12.0f, 6.0f, 0.7f};
-            // Band 1 & 5 (Shelves): Lower Q for smooth shelf response
-            // Bands 2, 3, 4 (Peaks): Very high Q for surgical precision cuts/boosts
+            const float defaultQValues[5] = {0.7f, 4.0f, 6.0f, 4.0f, 0.7f};
             params.push_back(std::make_unique<juce::AudioParameterFloat>(
                 prefix + "_q", prefix + " Q",
                 juce::NormalisableRange<float>(EQConstants::Q_MIN, EQConstants::Q_MAX, 0.01f, 0.3f),
-                testQDefaults[bandNum]));
+                defaultQValues[bandNum],
+                juce::AudioParameterFloatAttributes()));
 
             // Enabled parameter
             params.push_back(std::make_unique<juce::AudioParameterBool>(
@@ -143,7 +140,8 @@ public:
         // Global parameters
         params.push_back(std::make_unique<juce::AudioParameterFloat>(
             "output_gain", "Output Gain",
-            juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f), 0.0f, "dB"));
+            juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel("dB")));
 
         params.push_back(std::make_unique<juce::AudioParameterBool>(
             "bypass", "Bypass", false));

@@ -1,6 +1,5 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "JucePluginDefines.h"
 
 //==============================================================================
 FiveBandEQProcessor::FiveBandEQProcessor()
@@ -15,7 +14,8 @@ FiveBandEQProcessor::FiveBandEQProcessor()
         eqBands[i] = std::make_unique<EQBand>(static_cast<BandPosition>(i));
     }
 
-    // Set up parameter listeners
+    // Parameter listeners only mark a pending synchronization. DSP state is
+    // updated by the audio thread at the beginning of the next audio block.
     for (int band = 0; band < EQConstants::NUM_BANDS; ++band)
     {
         juce::String prefix = "band" + juce::String(band + 1);
@@ -85,36 +85,40 @@ int FiveBandEQProcessor::getCurrentProgram()
 
 void FiveBandEQProcessor::setCurrentProgram(int index)
 {
+    juce::ignoreUnused(index);
 }
 
 const juce::String FiveBandEQProcessor::getProgramName(int index)
 {
+    juce::ignoreUnused(index);
     return {};
 }
 
 void FiveBandEQProcessor::changeProgramName(int index, const juce::String &newName)
 {
+    juce::ignoreUnused(index, newName);
 }
 
 //==============================================================================
 void FiveBandEQProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
+    juce::ignoreUnused(samplesPerBlock);
     // Initialize all EQ bands
     for (auto &band : eqBands)
     {
         band->setSampleRate(sampleRate);
     }
 
-    // Setup output gain smoothing
+    // Set up output gain smoothing
     outputGain.reset(sampleRate, 0.01); // 10ms smoothing
     outputGain.setCurrentAndTargetValue(juce::Decibels::decibelsToGain(
         apvts.getRawParameterValue("output_gain")->load()));
 
-    // Initialize all bands from current parameter values
-    for (int i = 0; i < EQConstants::NUM_BANDS; ++i)
-    {
-        updateBandFromParameters(i);
-    }
+    bypassMix.reset(sampleRate, 0.01);
+    bypassMix.setCurrentAndTargetValue(apvts.getRawParameterValue("bypass")->load() > 0.5f ? 1.0f : 0.0f);
+
+    parametersNeedSynchronization.store(true);
+    synchronizeParametersFromHost();
 }
 
 void FiveBandEQProcessor::releaseResources()
@@ -143,6 +147,7 @@ bool FiveBandEQProcessor::isBusesLayoutSupported(const BusesLayout &layouts) con
 void FiveBandEQProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+    juce::ignoreUnused(midiMessages);
 
     auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
@@ -151,35 +156,44 @@ void FiveBandEQProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::M
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear(i, 0, buffer.getNumSamples());
 
-    // Check bypass
-    if (bypassed.load())
+    synchronizeParametersFromHost();
+
+    if (totalNumInputChannels == 0)
         return;
 
-    // Process each sample
     auto *leftChannel = buffer.getWritePointer(0);
-    auto *rightChannel = buffer.getWritePointer(1);
+    auto *rightChannel = totalNumInputChannels > 1 ? buffer.getWritePointer(1) : nullptr;
 
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
         float left = leftChannel[sample];
-        float right = rightChannel[sample];
+        const float dryLeft = left;
+        float right = rightChannel != nullptr ? rightChannel[sample] : 0.0f;
+        const float dryRight = right;
 
-        // Process through all 5 EQ bands in series
-        for (auto &band : eqBands)
+        if (rightChannel == nullptr)
         {
-            band->processStereo(left, right);
+            for (auto &band : eqBands)
+                band->processMono(left);
+        }
+        else
+        {
+            for (auto &band : eqBands)
+                band->processStereo(left, right);
         }
 
-        // Apply output gain (bypass if close to unity gain)
         float gain = outputGain.getNextValue();
-        if (std::abs(gain - 1.0f) > 0.001f) // Only apply if gain is significantly different from 1.0
-        {
-            left *= gain;
-            right *= gain;
-        }
+        left *= gain;
+        right *= gain;
+
+        const float wetMix = 1.0f - bypassMix.getNextValue();
+        left = dryLeft + (left - dryLeft) * wetMix;
+        right = dryRight + (right - dryRight) * wetMix;
 
         leftChannel[sample] = left;
-        rightChannel[sample] = right;
+
+        if (rightChannel != nullptr)
+            rightChannel[sample] = right;
     }
 }
 
@@ -214,27 +228,23 @@ void FiveBandEQProcessor::setStateInformation(const void *data, int sizeInBytes)
 //==============================================================================
 void FiveBandEQProcessor::parameterChanged(const juce::String &parameterID, float newValue)
 {
-    if (parameterID == "output_gain")
-    {
-        outputGain.setTargetValue(juce::Decibels::decibelsToGain(newValue));
-    }
-    else if (parameterID == "bypass")
-    {
-        bypassed.store(newValue > 0.5f);
-    }
-    else
-    {
-        // Handle band parameters
-        for (int band = 0; band < EQConstants::NUM_BANDS; ++band)
-        {
-            juce::String prefix = "band" + juce::String(band + 1);
-            if (parameterID.startsWith(prefix))
-            {
-                updateBandFromParameters(band);
-                break;
-            }
-        }
-    }
+    juce::ignoreUnused(parameterID, newValue);
+    parametersNeedSynchronization.store(true);
+}
+
+void FiveBandEQProcessor::synchronizeParametersFromHost()
+{
+    if (! parametersNeedSynchronization.exchange(false))
+        return;
+
+    for (int band = 0; band < EQConstants::NUM_BANDS; ++band)
+        updateBandFromParameters(band);
+
+    const float outputGainInDecibels = apvts.getRawParameterValue("output_gain")->load();
+    outputGain.setTargetValue(juce::Decibels::decibelsToGain(outputGainInDecibels));
+
+    const bool hostRequestedBypass = apvts.getRawParameterValue("bypass")->load() > 0.5f;
+    bypassMix.setTargetValue(hostRequestedBypass ? 1.0f : 0.0f);
 }
 
 void FiveBandEQProcessor::updateBandFromParameters(int bandIndex)

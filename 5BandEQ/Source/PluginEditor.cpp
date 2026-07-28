@@ -1,6 +1,5 @@
 #include "PluginEditor.h"
 #include "DSP/FilterTypes.h"
-#include "GUI/FrequencyResponseDisplay.cpp"
 
 //==============================================================================
 FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
@@ -28,13 +27,13 @@ FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
             paramLabels[labelIndex].setText(paramNames[j], juce::dontSendNotification);
             paramLabels[labelIndex].setJustificationType(juce::Justification::centred);
             paramLabels[labelIndex].setColour(juce::Label::textColourId, juce::Colours::lightgrey);
-            paramLabels[labelIndex].setFont(juce::Font(10.0f));
+            paramLabels[labelIndex].setFont(juce::Font(juce::FontOptions(10.0f)));
             addAndMakeVisible(paramLabels[labelIndex]);
         }
 
         // Setup gain sliders (vertical)
         gainSliders[i].setSliderStyle(juce::Slider::LinearVertical);
-        gainSliders[i].setRange(-20.0, 20.0, 0.1);
+        gainSliders[i].setRange(-24.0, 24.0, 0.1);
         gainSliders[i].setValue(0.0);
         gainSliders[i].setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 18);
         gainSliders[i].setColour(juce::Slider::thumbColourId, juce::Colours::orange);
@@ -52,7 +51,7 @@ FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
 
         // Setup Q sliders (rotary)
         qSliders[i].setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-        qSliders[i].setRange(0.1, 20.0, 0.01);
+        qSliders[i].setRange(0.1, 10.0, 0.01);
         qSliders[i].setSkewFactorFromMidPoint(1.0);
         qSliders[i].setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 18);
         qSliders[i].setColour(juce::Slider::thumbColourId, juce::Colours::yellow);
@@ -160,14 +159,14 @@ void FiveBandEQProcessorEditor::paint(juce::Graphics &g)
 {
     // Modern gradient background
     juce::ColourGradient gradient(juce::Colour::fromRGB(45, 48, 62), 0, 0,
-                                  juce::Colour::fromRGB(30, 32, 42), 0, getHeight(),
+                                  juce::Colour::fromRGB(30, 32, 42), 0, static_cast<float>(getHeight()),
                                   false);
     g.setGradientFill(gradient);
     g.fillAll();
 
     // Draw title
     g.setColour(juce::Colours::white);
-    g.setFont(juce::Font("Arial", 28.0f, juce::Font::bold));
+    g.setFont(juce::Font(juce::FontOptions("Arial", 28.0f, juce::Font::bold)));
     g.drawFittedText("5-Band Parametric EQ", getLocalBounds().removeFromTop(60),
                      juce::Justification::centred, 1);
 
@@ -179,7 +178,7 @@ void FiveBandEQProcessorEditor::paint(juce::Graphics &g)
     for (int i = 1; i < 5; ++i)
     {
         int x = bandArea.getX() + (i * bandArea.getWidth() / 5);
-        g.drawVerticalLine(x, bandArea.getY(), bandArea.getBottom());
+        g.drawVerticalLine(x, static_cast<float>(bandArea.getY()), static_cast<float>(bandArea.getBottom()));
     }
 }
 

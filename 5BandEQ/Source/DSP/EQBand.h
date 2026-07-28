@@ -1,5 +1,5 @@
 #pragma once
-#include <JuceHeader.h>
+#include <juce_audio_basics/juce_audio_basics.h>
 #include "BiquadFilter.h"
 #include "FilterTypes.h"
 #include "../Utils/Constants.h"
@@ -47,11 +47,14 @@ public:
 
     void setFilterType(FilterType type)
     {
-        if (FilterTypeRestrictions::isValidTypeForBand(type, bandPosition))
-        {
-            currentType = type;
-            updateFilters();
-        }
+        if (! FilterTypeRestrictions::isValidTypeForBand(type, bandPosition))
+            return;
+
+        if (currentType == type)
+            return;
+
+        currentType = type;
+        updateFilters();
     }
 
     void setFrequency(float frequency)
@@ -83,28 +86,18 @@ public:
         this->enabled = isEnabled;
     }
 
+    void processMono(float &sample)
+    {
+        if (! prepareForProcessing())
+            return;
+
+        sample = leftFilter.processSample(sample);
+    }
+
     void processStereo(float &left, float &right)
     {
-        if (!enabled || currentType == FilterType::Disabled)
+        if (! prepareForProcessing())
             return;
-
-        // Update smoothed parameters
-        bool paramsChanged = false;
-        if (frequencySmooth.isSmoothing() || gainSmooth.isSmoothing() || qSmooth.isSmoothing())
-        {
-            frequencySmooth.getNextValue();
-            gainSmooth.getNextValue();
-            qSmooth.getNextValue();
-            paramsChanged = true;
-        }
-
-        // Skip processing if gain is essentially 0dB (transparent)
-        float currentGain = gainSmooth.getCurrentValue();
-        if (std::abs(currentGain) < 0.01f) // Less than 0.01dB difference
-            return;
-
-        if (paramsChanged)
-            updateFilters();
 
         left = leftFilter.processSample(left);
         right = rightFilter.processSample(right);
@@ -142,5 +135,24 @@ private:
                                    gainSmooth.getCurrentValue(), qSmooth.getCurrentValue());
         rightFilter.setCoefficients(currentType, frequencySmooth.getCurrentValue(),
                                     gainSmooth.getCurrentValue(), qSmooth.getCurrentValue());
+    }
+
+    bool prepareForProcessing()
+    {
+        if (! enabled || currentType == FilterType::Disabled)
+            return false;
+
+        const bool parametersAreSmoothing = frequencySmooth.isSmoothing()
+                                          || gainSmooth.isSmoothing()
+                                          || qSmooth.isSmoothing();
+
+        if (! parametersAreSmoothing)
+            return true;
+
+        frequencySmooth.getNextValue();
+        gainSmooth.getNextValue();
+        qSmooth.getNextValue();
+        updateFilters();
+        return true;
     }
 };

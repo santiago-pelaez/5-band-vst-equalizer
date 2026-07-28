@@ -1,5 +1,7 @@
 #pragma once
-#include <JuceHeader.h>
+#include <juce_audio_processors/juce_audio_processors.h>
+#include <juce_audio_utils/juce_audio_utils.h>
+#include <juce_core/juce_core.h>
 #include "DSP/EQBand.h"
 #include "Utils/Parameters.h"
 #include "Utils/Constants.h"
@@ -69,10 +71,12 @@ private:
 
     // Output gain and bypass
     juce::SmoothedValue<float> outputGain;
-    std::atomic<bool> bypassed{false};
+    juce::SmoothedValue<float> bypassMix;
+    std::atomic<bool> parametersNeedSynchronization{true};
 
     // Helper methods
     void updateBandFromParameters(int bandIndex);
+    void synchronizeParametersFromHost();
 
     // Convert parameter choice index to FilterType
     FilterType getFilterTypeFromChoice(int choiceIndex, BandPosition position);

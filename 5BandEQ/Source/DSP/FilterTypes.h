@@ -1,5 +1,8 @@
 #pragma once
 
+#include <algorithm>
+#include <vector>
+
 /**
  * Filter types available for each band
  * Band 1 and 5 have restricted filter types

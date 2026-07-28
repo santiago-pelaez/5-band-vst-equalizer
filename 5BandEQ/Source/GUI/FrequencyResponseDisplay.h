@@ -1,7 +1,8 @@
 #pragma once
 
-#include <JuceHeader.h>
+#include <juce_gui_basics/juce_gui_basics.h>
 #include "../DSP/BiquadFilter.h"
+#include <complex>
 
 /**
  * Professional frequency response visualization component

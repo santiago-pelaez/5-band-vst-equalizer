@@ -1,5 +1,7 @@
 #pragma once
-#include <JuceHeader.h>
+#include <juce_core/juce_core.h>
+#include <algorithm>
+#include <cmath>
 #include "FilterTypes.h"
 
 /**
@@ -13,13 +15,17 @@ public:
 
     void setSampleRate(double newSampleRate)
     {
-        this->sampleRate = newSampleRate;
+        this->sampleRate = std::max(newSampleRate, 1.0);
         reset();
     }
 
     void setCoefficients(FilterType type, double frequency, double gain, double Q)
     {
-        calculateCoefficients(type, frequency, gain, Q);
+        const double safeFrequency = juce::jlimit(1.0, sampleRate * 0.49, frequency);
+        const double safeGain = juce::jlimit(-60.0, 60.0, gain);
+        const double safeQ = juce::jlimit(0.05, 100.0, Q);
+
+        calculateCoefficients(type, safeFrequency, safeGain, safeQ);
     }
 
     // Coefficient structure for frequency response analysis

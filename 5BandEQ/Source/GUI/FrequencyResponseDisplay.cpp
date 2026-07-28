@@ -25,7 +25,7 @@ FrequencyResponseDisplay::FrequencyResponseDisplay()
 
 void FrequencyResponseDisplay::setSampleRate(double newSampleRate)
 {
-    sampleRate = newSampleRate;
+    sampleRate = newSampleRate > 1.0 ? newSampleRate : 44100.0;
     updateResponse();
 }
 
@@ -135,7 +135,8 @@ void FrequencyResponseDisplay::calculateResponseCurve()
         // Multiply responses from all bands (addition in log domain)
         for (int bandIndex = 0; bandIndex < NUM_BANDS; ++bandIndex)
         {
-            if (bandParams[bandIndex].enabled && std::abs(bandParams[bandIndex].gain) > 0.01f)
+            if (bandParams[bandIndex].enabled
+                && bandParams[bandIndex].filterType != static_cast<int>(FilterType::Disabled))
             {
                 auto bandResponse = calculateBiquadResponse(bandParams[bandIndex], frequencyPoints[i]);
                 totalResponse *= bandResponse;
@@ -196,8 +197,9 @@ void FrequencyResponseDisplay::drawGrid(juce::Graphics &g)
     {
         if (freq >= MIN_FREQUENCY && freq <= MAX_FREQUENCY)
         {
-            float x = frequencyToX(freq, bounds.getWidth());
-            g.drawVerticalLine(static_cast<int>(x), 0, bounds.getHeight());
+            const float componentWidth = static_cast<float>(bounds.getWidth());
+            float x = frequencyToX(freq, componentWidth);
+            g.drawVerticalLine(static_cast<int>(x), 0.0f, static_cast<float>(bounds.getHeight()));
         }
     }
 
@@ -206,9 +208,10 @@ void FrequencyResponseDisplay::drawGrid(juce::Graphics &g)
 
     for (auto gain : gainLines)
     {
-        float y = gainToY(gain, bounds.getHeight());
+        const float componentHeight = static_cast<float>(bounds.getHeight());
+        float y = gainToY(gain, componentHeight);
         g.setColour(gain == 0.0f ? juce::Colour::fromRGB(70, 75, 85) : juce::Colour::fromRGB(45, 50, 60));
-        g.drawHorizontalLine(static_cast<int>(y), 0, bounds.getWidth());
+        g.drawHorizontalLine(static_cast<int>(y), 0.0f, static_cast<float>(bounds.getWidth()));
     }
 }
 
@@ -218,12 +221,13 @@ void FrequencyResponseDisplay::drawFrequencyLabels(juce::Graphics &g)
     g.setColour(juce::Colours::lightgrey);
     g.setFont(10.0f);
 
-    std::array<float, 7> labelFreqs = {20, 100, 1000, 5000, 10000, 20000};
+    std::array<float, 6> labelFreqs = {20, 100, 1000, 5000, 10000, 20000};
     std::array<juce::String, 6> labels = {"20", "100", "1K", "5K", "10K", "20K"};
 
     for (size_t i = 0; i < labelFreqs.size() && i < labels.size(); ++i)
     {
-        float x = frequencyToX(labelFreqs[i], bounds.getWidth());
+        const float componentWidth = static_cast<float>(bounds.getWidth());
+        float x = frequencyToX(labelFreqs[i], componentWidth);
         g.drawText(labels[i], static_cast<int>(x - 15), bounds.getHeight() - 15, 30, 12, juce::Justification::centred);
     }
 }
@@ -238,7 +242,8 @@ void FrequencyResponseDisplay::drawGainLabels(juce::Graphics &g)
 
     for (auto gain : labelGains)
     {
-        float y = gainToY(gain, bounds.getHeight());
+        const float componentHeight = static_cast<float>(bounds.getHeight());
+        float y = gainToY(gain, componentHeight);
         juce::String label = juce::String(static_cast<int>(gain)) + "dB";
         g.drawText(label, 5, static_cast<int>(y - 6), 40, 12, juce::Justification::left);
     }
@@ -254,8 +259,10 @@ void FrequencyResponseDisplay::drawResponseCurve(juce::Graphics &g)
 
     for (int i = 0; i < RESPONSE_CURVE_POINTS; ++i)
     {
-        float x = frequencyToX(frequencyPoints[i], bounds.getWidth());
-        float y = gainToY(responseData[i], bounds.getHeight());
+        const float componentWidth = static_cast<float>(bounds.getWidth());
+        const float componentHeight = static_cast<float>(bounds.getHeight());
+        float x = frequencyToX(frequencyPoints[i], componentWidth);
+        float y = gainToY(responseData[i], componentHeight);
 
         if (firstPoint)
         {

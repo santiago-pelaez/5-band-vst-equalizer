@@ -1,31 +1,44 @@
-# VST Plugin Build Files
+# Generated JUCE and CMake files
 Builds/
 JuceLibraryCode/
+build/
+install/
+CMakeUserPresets.json
 
-# IDE Files
+# Visual Studio and CMake IDE state
 .vs/
 .vscode/
 *.vcxproj.user
 *.sln
 *.vcxproj
 *.vcxproj.filters
-*.sdf
-*.opensdf
 *.suo
-.DS_Store
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
 
-# Compiled Output
+# Compiled output
 *.dll
-*.dylib
+*.exe
+*.pdb
+*.ilk
+*.lib
+*.exp
+*.obj
 *.vst3
 *.component
 *.aax
 
-# Temporary Files
-Temp/
-*.tmp
+# Test and profiling output
+Testing/
 *.log
+*.tmp
 
-# User Settings
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# User settings
 *.user
 *.userprefs

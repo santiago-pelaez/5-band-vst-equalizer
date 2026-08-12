@@ -21,6 +21,7 @@ set(FIVE_BAND_EQ_SOURCES
     5BandEQ/Source/PluginProcessor.cpp
     5BandEQ/Source/DSP/BiquadFilter.cpp
     5BandEQ/Source/DSP/EQBand.cpp
+    5BandEQ/Source/GUI/BandControlPanel.cpp
     5BandEQ/Source/GUI/FrequencyResponseDisplay.cpp
 )
 
@@ -74,6 +75,10 @@ if(FIVE_BAND_EQ_BUILD_TESTS)
         5BandEQ/Source/DSP/BiquadFilter.cpp
     )
 
+    add_executable(FiveBandEQ_ParameterTests
+        Tests/ParameterStateTests.cpp
+    )
+
     target_include_directories(FiveBandEQ_Tests PRIVATE
         5BandEQ/Source
     )
@@ -91,5 +96,23 @@ if(FIVE_BAND_EQ_BUILD_TESTS)
         juce::juce_recommended_warning_flags
     )
 
+    target_include_directories(FiveBandEQ_ParameterTests PRIVATE
+        5BandEQ/Source
+    )
+
+    target_compile_definitions(FiveBandEQ_ParameterTests PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+    )
+
+    target_link_libraries(FiveBandEQ_ParameterTests PRIVATE
+        juce::juce_audio_processors
+        juce::juce_audio_basics
+        juce::juce_core
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+    )
+
     add_test(NAME FiveBandEQ_DspTests COMMAND FiveBandEQ_Tests)
+    add_test(NAME FiveBandEQ_ParameterTests COMMAND FiveBandEQ_ParameterTests)
 endif()

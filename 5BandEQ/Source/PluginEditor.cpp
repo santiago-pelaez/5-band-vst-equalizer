@@ -1,286 +1,269 @@
 #include "PluginEditor.h"
-#include "DSP/FilterTypes.h"
 
-//==============================================================================
-FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &p)
-    : AudioProcessorEditor(&p), audioProcessor(p)
+#include <array>
+
+namespace
 {
-    // Set editor size - increased height for frequency response display and controls
-    setSize(800, 550);
+    constexpr int DEFAULT_EDITOR_WIDTH = 1000;
+    constexpr int DEFAULT_EDITOR_HEIGHT = 700;
+    constexpr int MINIMUM_EDITOR_WIDTH = 900;
+    constexpr int MINIMUM_EDITOR_HEIGHT = 620;
+    constexpr int TITLE_BAR_HEIGHT = 72;
+    constexpr int RESPONSE_DISPLAY_HEIGHT = 210;
+}
 
-    // Setup band controls - each band gets gain, frequency, Q, and filter type controls
-    const juce::String bandNames[5] = {"Low", "Low-Mid", "Mid", "High-Mid", "High"};
-    const juce::String paramNames[4] = {"Gain", "Freq", "Q", "Type"};
+FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &processor)
+    : AudioProcessorEditor(&processor),
+      audioProcessor(processor)
+{
+    setSize(DEFAULT_EDITOR_WIDTH, DEFAULT_EDITOR_HEIGHT);
+    setResizable(true, true);
+    setResizeLimits(MINIMUM_EDITOR_WIDTH, MINIMUM_EDITOR_HEIGHT, 1600, 1100);
 
-    for (int i = 0; i < 5; ++i)
+    const std::array<BandPosition, EQConstants::NUM_BANDS> bandPositions = {
+        BandPosition::Low,
+        BandPosition::LowMid,
+        BandPosition::Mid,
+        BandPosition::HighMid,
+        BandPosition::High};
+    const std::array<juce::String, EQConstants::NUM_BANDS> bandNames = {
+        "Low",
+        "Low-Mid",
+        "Mid",
+        "High-Mid",
+        "High"};
+
+    for (int bandIndex = 0; bandIndex < EQConstants::NUM_BANDS; ++bandIndex)
     {
-        // Setup band labels
-        bandLabels[i].setText(bandNames[i], juce::dontSendNotification);
-        bandLabels[i].setJustificationType(juce::Justification::centred);
-        bandLabels[i].setColour(juce::Label::textColourId, juce::Colours::white);
-        addAndMakeVisible(bandLabels[i]);
+        bandControlPanels[bandIndex] = std::make_unique<BandControlPanel>(
+            audioProcessor.getAPVTS(),
+            bandIndex,
+            bandPositions[bandIndex],
+            bandNames[bandIndex]);
 
-        // Setup parameter labels (Gain, Freq, Q, Type for each band)
-        for (int j = 0; j < 4; ++j)
+        bandControlPanels[bandIndex]->onParametersChanged = [this](int changedBandIndex)
         {
-            int labelIndex = i * 4 + j;
-            paramLabels[labelIndex].setText(paramNames[j], juce::dontSendNotification);
-            paramLabels[labelIndex].setJustificationType(juce::Justification::centred);
-            paramLabels[labelIndex].setColour(juce::Label::textColourId, juce::Colours::lightgrey);
-            paramLabels[labelIndex].setFont(juce::Font(juce::FontOptions(10.0f)));
-            addAndMakeVisible(paramLabels[labelIndex]);
-        }
+            juce::ignoreUnused(changedBandIndex);
+            updateFrequencyResponse();
+        };
 
-        // Setup gain sliders (vertical)
-        gainSliders[i].setSliderStyle(juce::Slider::LinearVertical);
-        gainSliders[i].setRange(-24.0, 24.0, 0.1);
-        gainSliders[i].setValue(0.0);
-        gainSliders[i].setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 18);
-        gainSliders[i].setColour(juce::Slider::thumbColourId, juce::Colours::orange);
-        gainSliders[i].setColour(juce::Slider::trackColourId, juce::Colours::darkgrey);
-        addAndMakeVisible(gainSliders[i]);
-
-        // Setup frequency sliders (rotary)
-        freqSliders[i].setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-        freqSliders[i].setRange(20.0, 20000.0, 1.0);
-        freqSliders[i].setSkewFactorFromMidPoint(1000.0); // Logarithmic scaling
-        freqSliders[i].setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
-        freqSliders[i].setColour(juce::Slider::thumbColourId, juce::Colours::cyan);
-        freqSliders[i].setColour(juce::Slider::rotarySliderFillColourId, juce::Colours::cyan);
-        addAndMakeVisible(freqSliders[i]);
-
-        // Setup Q sliders (rotary)
-        qSliders[i].setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-        qSliders[i].setRange(0.1, 10.0, 0.01);
-        qSliders[i].setSkewFactorFromMidPoint(1.0);
-        qSliders[i].setTextBoxStyle(juce::Slider::TextBoxBelow, false, 50, 18);
-        qSliders[i].setColour(juce::Slider::thumbColourId, juce::Colours::yellow);
-        qSliders[i].setColour(juce::Slider::rotarySliderFillColourId, juce::Colours::yellow);
-        addAndMakeVisible(qSliders[i]);
-
-        // Setup filter type ComboBox with band-specific options
-        filterTypeBoxes[i].setColour(juce::ComboBox::backgroundColourId, juce::Colours::darkgrey);
-        filterTypeBoxes[i].setColour(juce::ComboBox::textColourId, juce::Colours::white);
-        filterTypeBoxes[i].setColour(juce::ComboBox::arrowColourId, juce::Colours::lightblue);
-        filterTypeBoxes[i].setJustificationType(juce::Justification::centred);
-
-        // Add filter type options based on band restrictions
-        BandPosition position;
-        if (i == 0)
-            position = BandPosition::Low;
-        else if (i == 1)
-            position = BandPosition::LowMid;
-        else if (i == 2)
-            position = BandPosition::Mid;
-        else if (i == 3)
-            position = BandPosition::HighMid;
-        else
-            position = BandPosition::High;
-
-        auto availableTypes = FilterTypeRestrictions::getAvailableTypes(position);
-        int itemId = 1;
-
-        for (auto type : availableTypes)
-        {
-            switch (type)
-            {
-            case FilterType::Peak:
-                filterTypeBoxes[i].addItem("Peak", itemId++);
-                break;
-            case FilterType::LowCut:
-                filterTypeBoxes[i].addItem("Low Cut", itemId++);
-                break;
-            case FilterType::LowShelf:
-                filterTypeBoxes[i].addItem("Low Shelf", itemId++);
-                break;
-            case FilterType::HighCut:
-                filterTypeBoxes[i].addItem("High Cut", itemId++);
-                break;
-            case FilterType::HighShelf:
-                filterTypeBoxes[i].addItem("High Shelf", itemId++);
-                break;
-            case FilterType::Disabled:
-                filterTypeBoxes[i].addItem("Disabled", itemId++);
-                break;
-            }
-        }
-
-        addAndMakeVisible(filterTypeBoxes[i]);
-
-        // Create parameter attachments
-        juce::String bandPrefix = "band" + juce::String(i + 1);
-        gainAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-            audioProcessor.getAPVTS(), bandPrefix + "_gain", gainSliders[i]);
-        freqAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-            audioProcessor.getAPVTS(), bandPrefix + "_freq", freqSliders[i]);
-        qAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
-            audioProcessor.getAPVTS(), bandPrefix + "_q", qSliders[i]);
-        typeAttachments[i] = std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(
-            audioProcessor.getAPVTS(), bandPrefix + "_type", filterTypeBoxes[i]);
+        addAndMakeVisible(*bandControlPanels[bandIndex]);
     }
 
-    // Setup bypass button (toggle style)
+    frequencyResponseDisplay.onBandSelected = [this](int selectedBandIndex)
+    {
+        selectBand(selectedBandIndex);
+    };
+    frequencyResponseDisplay.onNodeEdit = [this](const FrequencyResponseDisplay::NodeEditEvent &event)
+    {
+        handleNodeEdit(event);
+    };
+
+    outputGainLabel.setText("Output Gain", juce::dontSendNotification);
+    outputGainLabel.setJustificationType(juce::Justification::centredRight);
+    outputGainLabel.setColour(juce::Label::textColourId, juce::Colours::lightgrey);
+    addAndMakeVisible(outputGainLabel);
+
+    outputGainSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+    outputGainSlider.setRange(-24.0, 24.0, 0.1);
+    outputGainSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 64, 22);
+    outputGainSlider.setTextValueSuffix(" dB");
+    outputGainSlider.setColour(juce::Slider::thumbColourId, juce::Colours::orange);
+    outputGainSlider.setColour(juce::Slider::trackColourId, juce::Colours::darkgrey);
+    outputGainSlider.setColour(juce::Slider::backgroundColourId, juce::Colour::fromRGB(30, 32, 42));
+    addAndMakeVisible(outputGainSlider);
+
+    outputGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
+        audioProcessor.getAPVTS(), "output_gain", outputGainSlider);
+
     bypassButton.setButtonText("Bypass");
     bypassButton.setColour(juce::ToggleButton::textColourId, juce::Colours::white);
     bypassButton.setColour(juce::ToggleButton::tickDisabledColourId, juce::Colours::darkred);
     bypassButton.setColour(juce::ToggleButton::tickColourId, juce::Colours::red);
     addAndMakeVisible(bypassButton);
 
-    // Create bypass parameter attachment
-    bypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(audioProcessor.getAPVTS(), "bypass", bypassButton);
+    bypassAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment>(
+        audioProcessor.getAPVTS(), "bypass", bypassButton);
 
-    // Setup frequency response display
     addAndMakeVisible(frequencyResponseDisplay);
     frequencyResponseDisplay.setSampleRate(audioProcessor.getSampleRate());
-
-    // Set up parameter listeners for real-time updates
-    for (int i = 0; i < 5; ++i)
-    {
-        gainSliders[i].onValueChange = [this]
-        { updateFrequencyResponse(); };
-        freqSliders[i].onValueChange = [this]
-        { updateFrequencyResponse(); };
-        qSliders[i].onValueChange = [this]
-        { updateFrequencyResponse(); };
-        filterTypeBoxes[i].onChange = [this]
-        { updateFrequencyResponse(); };
-    }
-
-    // Initial update
     updateFrequencyResponse();
+
+    // setSize() may trigger resized() before child components exist. Perform
+    // one explicit final layout after every panel and global control has been
+    // created so the initial editor matches the layout used after resizing.
+    resized();
 }
 
-FiveBandEQProcessorEditor::~FiveBandEQProcessorEditor()
+FiveBandEQProcessorEditor::~FiveBandEQProcessorEditor() = default;
+
+void FiveBandEQProcessorEditor::paint(juce::Graphics &graphics)
 {
-}
+    const juce::ColourGradient backgroundGradient(
+        juce::Colour::fromRGB(45, 48, 62),
+        0.0f,
+        0.0f,
+        juce::Colour::fromRGB(30, 32, 42),
+        0.0f,
+        static_cast<float>(getHeight()),
+        false);
 
-//==============================================================================
-void FiveBandEQProcessorEditor::paint(juce::Graphics &g)
-{
-    // Modern gradient background
-    juce::ColourGradient gradient(juce::Colour::fromRGB(45, 48, 62), 0, 0,
-                                  juce::Colour::fromRGB(30, 32, 42), 0, static_cast<float>(getHeight()),
-                                  false);
-    g.setGradientFill(gradient);
-    g.fillAll();
+    graphics.setGradientFill(backgroundGradient);
+    graphics.fillAll();
 
-    // Draw title
-    g.setColour(juce::Colours::white);
-    g.setFont(juce::Font(juce::FontOptions("Arial", 28.0f, juce::Font::bold)));
-    g.drawFittedText("5-Band Parametric EQ", getLocalBounds().removeFromTop(60),
-                     juce::Justification::centred, 1);
+    graphics.setColour(juce::Colour::fromRGB(25, 28, 35));
+    graphics.fillRect(getLocalBounds().removeFromTop(TITLE_BAR_HEIGHT));
 
-    // Draw subtle separators between bands
-    g.setColour(juce::Colour::fromRGB(70, 75, 90));
-    auto bandArea = getLocalBounds().removeFromTop(60).reduced(10, 0);
-    bandArea.removeFromTop(70); // Skip title
+    graphics.setColour(juce::Colours::white);
+    graphics.setFont(juce::Font(juce::FontOptions("Arial", 26.0f, juce::Font::bold)));
+    graphics.drawFittedText("5-Band Parametric EQ",
+                            juce::Rectangle<int>(18, 0, 350, TITLE_BAR_HEIGHT),
+                            juce::Justification::centredLeft,
+                            1);
 
-    for (int i = 1; i < 5; ++i)
-    {
-        int x = bandArea.getX() + (i * bandArea.getWidth() / 5);
-        g.drawVerticalLine(x, static_cast<float>(bandArea.getY()), static_cast<float>(bandArea.getBottom()));
-    }
+    graphics.setColour(juce::Colour::fromRGB(145, 155, 175));
+    graphics.setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
+    graphics.drawText("BAND CONTROLS",
+                      18,
+                      TITLE_BAR_HEIGHT + RESPONSE_DISPLAY_HEIGHT + 2,
+                      160,
+                      20,
+                      juce::Justification::left);
 }
 
 void FiveBandEQProcessorEditor::resized()
 {
     auto bounds = getLocalBounds();
 
-    // Reserve space for title
-    auto titleArea = bounds.removeFromTop(60);
+    auto headerArea = bounds.removeFromTop(TITLE_BAR_HEIGHT).reduced(18, 14);
+    auto bypassArea = headerArea.removeFromRight(100);
+    bypassButton.setBounds(bypassArea);
 
-    // Reserve space for frequency response display at top
-    auto responseArea = bounds.removeFromTop(150);
-    frequencyResponseDisplay.setBounds(responseArea.reduced(20, 10));
+    auto outputGainArea = headerArea.removeFromRight(310);
+    outputGainLabel.setBounds(outputGainArea.removeFromLeft(92));
+    outputGainSlider.setBounds(outputGainArea.reduced(6, 2));
 
-    // Reserve space for bypass button at bottom
-    auto bottomArea = bounds.removeFromBottom(50);
-    bypassButton.setBounds(bottomArea.removeFromRight(100).reduced(10));
+    const auto responseArea = bounds.removeFromTop(RESPONSE_DISPLAY_HEIGHT);
+    frequencyResponseDisplay.setBounds(responseArea.reduced(18, 10));
 
-    // Divide remaining space for 5 bands
-    auto bandArea = bounds.reduced(10);
-    int bandWidth = bandArea.getWidth() / 5;
+    bounds.removeFromTop(28);
+    auto bandArea = bounds.reduced(12, 6);
+    const int panelWidth = bandArea.getWidth() / EQConstants::NUM_BANDS;
 
-    for (int i = 0; i < 5; ++i)
+    for (auto &bandPanel : bandControlPanels)
     {
-        auto currentBandArea = bandArea.removeFromLeft(bandWidth).reduced(5);
+        if (bandPanel == nullptr)
+            continue;
 
-        // Band label at top
-        bandLabels[i].setBounds(currentBandArea.removeFromTop(25));
-
-        // Create areas for the four controls per band
-        auto controlArea = currentBandArea;
-
-        // Top row: Frequency and Q controls (rotary knobs)
-        auto topRow = controlArea.removeFromTop(105);
-        auto freqArea = topRow.removeFromLeft(topRow.getWidth() / 2).reduced(5);
-        auto qArea = topRow.reduced(5);
-
-        // Labels for freq and Q (updated indexing for 4 params per band)
-        int freqLabelIndex = i * 4 + 1; // Freq is second param
-        int qLabelIndex = i * 4 + 2;    // Q is third param
-
-        paramLabels[freqLabelIndex].setBounds(freqArea.removeFromTop(15));
-        freqSliders[i].setBounds(freqArea.removeFromTop(75));
-
-        paramLabels[qLabelIndex].setBounds(qArea.removeFromTop(15));
-        qSliders[i].setBounds(qArea.removeFromTop(75));
-
-        // Middle row: Filter type ComboBox
-        auto typeArea = controlArea.removeFromTop(40).reduced(10, 5);
-        int typeLabelIndex = i * 4 + 3; // Type is fourth param
-
-        paramLabels[typeLabelIndex].setBounds(typeArea.removeFromTop(15));
-        filterTypeBoxes[i].setBounds(typeArea);
-
-        // Bottom: Gain slider (vertical)
-        auto gainArea = controlArea.reduced(15, 5);
-        int gainLabelIndex = i * 4; // Gain is first param (updated indexing)
-
-        paramLabels[gainLabelIndex].setBounds(gainArea.removeFromTop(15));
-        gainSliders[i].setBounds(gainArea);
+        bandPanel->setBounds(bandArea.removeFromLeft(panelWidth).reduced(5));
     }
 }
 
 void FiveBandEQProcessorEditor::updateFrequencyResponse()
 {
-    // Get current parameter values and update the frequency response display
-    for (int i = 0; i < 5; ++i)
+    for (const auto &bandPanel : bandControlPanels)
     {
-        float gain = static_cast<float>(gainSliders[i].getValue());
-        float freq = static_cast<float>(freqSliders[i].getValue());
-        float q = static_cast<float>(qSliders[i].getValue());
-        int filterType = filterTypeBoxes[i].getSelectedId() - 1; // Adjust for 0-based index
+        if (bandPanel == nullptr)
+            continue;
 
-        // Map ComboBox selection to FilterType enum
-        // This needs to account for the restricted types per band
-        BandPosition position;
-        if (i == 0)
-            position = BandPosition::Low;
-        else if (i == 1)
-            position = BandPosition::LowMid;
-        else if (i == 2)
-            position = BandPosition::Mid;
-        else if (i == 3)
-            position = BandPosition::HighMid;
-        else
-            position = BandPosition::High;
-
-        auto availableTypes = FilterTypeRestrictions::getAvailableTypes(position);
-
-        // Convert to actual filter type enum
-        FilterType actualType = FilterType::Peak; // default
-        if (filterType >= 0 && filterType < static_cast<int>(availableTypes.size()))
-        {
-            actualType = availableTypes[filterType];
-        }
-
-        const juce::String enabledParameterID = "band" + juce::String(i + 1) + "_enabled";
-        const auto *enabledParameter = audioProcessor.getAPVTS().getRawParameterValue(enabledParameterID);
-        const bool enabled = enabledParameter != nullptr && enabledParameter->load() > 0.5f;
-
-        // Update the frequency response display with band parameters.
-        frequencyResponseDisplay.setBandParameters(i, freq, gain, q,
-                                                    static_cast<int>(actualType), enabled);
+        frequencyResponseDisplay.setBandParameters(
+            bandPanel->getBandIndex(),
+            bandPanel->getFrequency(),
+            bandPanel->getGain(),
+            bandPanel->getQ(),
+            static_cast<int>(bandPanel->getFilterType()),
+            bandPanel->isBandEnabled());
     }
+}
+
+void FiveBandEQProcessorEditor::selectBand(int bandIndex)
+{
+    if (bandIndex < 0 || bandIndex >= EQConstants::NUM_BANDS)
+        return;
+
+    for (int currentBandIndex = 0; currentBandIndex < EQConstants::NUM_BANDS; ++currentBandIndex)
+    {
+        if (bandControlPanels[currentBandIndex] == nullptr)
+            continue;
+
+        bandControlPanels[currentBandIndex]->setSelected(currentBandIndex == bandIndex);
+    }
+
+    frequencyResponseDisplay.setSelectedBand(bandIndex);
+}
+
+void FiveBandEQProcessorEditor::handleNodeEdit(const FrequencyResponseDisplay::NodeEditEvent &event)
+{
+    if (event.bandIndex < 0 || event.bandIndex >= EQConstants::NUM_BANDS)
+        return;
+
+    selectBand(event.bandIndex);
+
+    if (event.phase == FrequencyResponseDisplay::NodeEditPhase::Begin)
+    {
+        beginBandParameterGesture(event.bandIndex, "_freq");
+
+        if (event.gainIsEditable)
+            beginBandParameterGesture(event.bandIndex, "_gain");
+    }
+
+    setBandParameterValue(event.bandIndex, "_freq", event.frequency);
+
+    if (event.gainIsEditable)
+        setBandParameterValue(event.bandIndex, "_gain", event.gain);
+
+    if (event.phase == FrequencyResponseDisplay::NodeEditPhase::End)
+    {
+        endBandParameterGesture(event.bandIndex, "_freq");
+
+        if (event.gainIsEditable)
+            endBandParameterGesture(event.bandIndex, "_gain");
+    }
+
+    updateFrequencyResponse();
+}
+
+juce::RangedAudioParameter *FiveBandEQProcessorEditor::getBandParameter(
+    int bandIndex,
+    const juce::String &suffix)
+{
+    if (bandIndex < 0 || bandIndex >= EQConstants::NUM_BANDS)
+        return nullptr;
+
+    const juce::String parameterID = "band" + juce::String(bandIndex + 1) + suffix;
+    return audioProcessor.getAPVTS().getParameter(parameterID);
+}
+
+void FiveBandEQProcessorEditor::setBandParameterValue(int bandIndex,
+                                                       const juce::String &suffix,
+                                                       float value)
+{
+    auto *parameter = getBandParameter(bandIndex, suffix);
+
+    if (parameter == nullptr)
+        return;
+
+    parameter->setValueNotifyingHost(parameter->convertTo0to1(value));
+}
+
+void FiveBandEQProcessorEditor::beginBandParameterGesture(int bandIndex,
+                                                           const juce::String &suffix)
+{
+    auto *parameter = getBandParameter(bandIndex, suffix);
+
+    if (parameter == nullptr)
+        return;
+
+    parameter->beginChangeGesture();
+}
+
+void FiveBandEQProcessorEditor::endBandParameterGesture(int bandIndex,
+                                                         const juce::String &suffix)
+{
+    auto *parameter = getBandParameter(bandIndex, suffix);
+
+    if (parameter == nullptr)
+        return;
+
+    parameter->endChangeGesture();
 }

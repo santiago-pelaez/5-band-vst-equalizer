@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_gui_basics/juce_gui_basics.h>
+#include <functional>
 #include "../DSP/BiquadFilter.h"
 
 /**
@@ -13,12 +14,31 @@
 class FrequencyResponseDisplay : public juce::Component
 {
 public:
+    enum class NodeEditPhase
+    {
+        Begin,
+        Update,
+        End
+    };
+
+    struct NodeEditEvent
+    {
+        int bandIndex = -1;
+        NodeEditPhase phase = NodeEditPhase::Update;
+        float frequency = 1000.0f;
+        float gain = 0.0f;
+        bool gainIsEditable = true;
+    };
+
     FrequencyResponseDisplay();
     ~FrequencyResponseDisplay() override;
 
     //==============================================================================
     void paint(juce::Graphics &g) override;
     void resized() override;
+    void mouseDown(const juce::MouseEvent &event) override;
+    void mouseDrag(const juce::MouseEvent &event) override;
+    void mouseUp(const juce::MouseEvent &event) override;
 
     /**
      * Update the frequency response curve
@@ -36,6 +56,11 @@ public:
      */
     void setBandParameters(int bandIndex, float freq, float gain, float q, int filterType, bool enabled);
 
+    void setSelectedBand(int bandIndex);
+
+    std::function<void(int)> onBandSelected;
+    std::function<void(const NodeEditEvent &)> onNodeEdit;
+
     /**
      * Set sample rate for frequency response calculations
      * @param newSampleRate Sample rate in Hz
@@ -48,8 +73,8 @@ private:
     static constexpr int RESPONSE_CURVE_POINTS = 512;
     static constexpr float MIN_FREQUENCY = 20.0f;
     static constexpr float MAX_FREQUENCY = 20000.0f;
-    static constexpr float MIN_GAIN_DB = -20.0f;
-    static constexpr float MAX_GAIN_DB = 20.0f;
+    static constexpr float MIN_GAIN_DB = -24.0f;
+    static constexpr float MAX_GAIN_DB = 24.0f;
 
     // Band parameters for response calculation
     struct BandParams
@@ -72,6 +97,7 @@ private:
 
     //==============================================================================
     // Helper functions for coordinate transformation
+    juce::Rectangle<int> getPlotBounds() const;
     float frequencyToX(float freq, float width) const;
     float gainToY(float gainDB, float height) const;
     float xToFrequency(float x, float width) const;
@@ -87,6 +113,14 @@ private:
     void drawFrequencyLabels(juce::Graphics &g);
     void drawGainLabels(juce::Graphics &g);
     void drawResponseCurve(juce::Graphics &g);
+    void drawNodes(juce::Graphics &g);
+
+    int findNodeAtPosition(juce::Point<float> position) const;
+    juce::Point<float> getNodePosition(int bandIndex) const;
+    void updateDraggedNode(juce::Point<float> position, NodeEditPhase phase);
+
+    int selectedBandIndex = -1;
+    int draggedBandIndex = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FrequencyResponseDisplay)
 };

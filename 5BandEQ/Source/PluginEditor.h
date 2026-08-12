@@ -1,6 +1,7 @@
 #pragma once
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginProcessor.h"
+#include "GUI/BandControlPanel.h"
 #include "GUI/FrequencyResponseDisplay.h"
 
 /**
@@ -20,23 +21,23 @@ public:
     void updateFrequencyResponse();
 
 private:
+    void selectBand(int bandIndex);
+    void handleNodeEdit(const FrequencyResponseDisplay::NodeEditEvent &event);
+    juce::RangedAudioParameter *getBandParameter(int bandIndex, const juce::String &suffix);
+    void setBandParameterValue(int bandIndex, const juce::String &suffix, float value);
+    void beginBandParameterGesture(int bandIndex, const juce::String &suffix);
+    void endBandParameterGesture(int bandIndex, const juce::String &suffix);
+
     FiveBandEQProcessor &audioProcessor;
 
-    // GUI Components
+    // GUI components. Each band owns its controls and APVTS attachments.
+    std::array<std::unique_ptr<BandControlPanel>, EQConstants::NUM_BANDS> bandControlPanels;
     FrequencyResponseDisplay frequencyResponseDisplay;
-    juce::Slider gainSliders[5];
-    juce::Slider freqSliders[5];
-    juce::Slider qSliders[5];
-    juce::ComboBox filterTypeBoxes[5];
-    juce::Label bandLabels[5];
-    juce::Label paramLabels[20]; // 4 labels per band (Gain, Freq, Q, Type)
+    juce::Label outputGainLabel;
+    juce::Slider outputGainSlider;
     juce::ToggleButton bypassButton;
 
-    // Parameter attachments for automatic binding
-    std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>, 5> gainAttachments;
-    std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>, 5> freqAttachments;
-    std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>, 5> qAttachments;
-    std::array<std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment>, 5> typeAttachments;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> outputGainAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FiveBandEQProcessorEditor)

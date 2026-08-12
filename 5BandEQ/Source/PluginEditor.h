@@ -7,7 +7,8 @@
 /**
  * Main GUI editor for the 5-band EQ with restricted filter types and frequency response visualization
  */
-class FiveBandEQProcessorEditor : public juce::AudioProcessorEditor
+class FiveBandEQProcessorEditor : public juce::AudioProcessorEditor,
+                                   private juce::Timer
 {
 public:
     FiveBandEQProcessorEditor(FiveBandEQProcessor &);
@@ -21,6 +22,7 @@ public:
     void updateFrequencyResponse();
 
 private:
+    void timerCallback() override;
     void selectBand(int bandIndex);
     void handleNodeEdit(const FrequencyResponseDisplay::NodeEditEvent &event);
     juce::RangedAudioParameter *getBandParameter(int bandIndex, const juce::String &suffix);
@@ -36,6 +38,7 @@ private:
     juce::Label outputGainLabel;
     juce::Slider outputGainSlider;
     juce::ToggleButton bypassButton;
+    SpectrumAnalyzer::SpectrumFrame latestSpectrumFrame;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> outputGainAttachment;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bypassAttachment;

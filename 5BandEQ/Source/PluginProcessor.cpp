@@ -119,7 +119,8 @@ void FiveBandEQProcessor::changeProgramName(int index, const juce::String &newNa
 //==============================================================================
 void FiveBandEQProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-    juce::ignoreUnused(samplesPerBlock);
+    spectrumAnalyzer.prepare(sampleRate, samplesPerBlock);
+
     // Initialize all EQ bands
     for (auto &band : eqBands)
     {
@@ -187,6 +188,8 @@ void FiveBandEQProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::M
         float right = rightChannel != nullptr ? rightChannel[sample] : 0.0f;
         const float dryRight = right;
 
+        spectrumAnalyzer.pushInputSample(left, rightChannel != nullptr ? right : left);
+
         if (rightChannel == nullptr)
         {
             for (auto &band : eqBands)
@@ -210,6 +213,8 @@ void FiveBandEQProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::M
 
         if (rightChannel != nullptr)
             rightChannel[sample] = right;
+
+        spectrumAnalyzer.pushOutputSample(left, rightChannel != nullptr ? right : left);
     }
 }
 

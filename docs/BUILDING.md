@@ -31,7 +31,7 @@ cmake -S . -B build/custom -G "Visual Studio 18 2026" -A x64 -DJUCE_DIR="D:/libr
 ```powershell
 cmake --build build/windows-vs2022 --config Debug --target FiveBandEQ_Standalone
 cmake --build build/windows-vs2022 --config Debug --target FiveBandEQ_VST3
-cmake --build build/windows-vs2022 --config Debug --target FiveBandEQ_Tests
+cmake --build build/windows-vs2022 --config Debug --target FiveBandEQ_Tests FiveBandEQ_ParameterTests FiveBandEQ_SpectrumTests FiveBandEQ_ProcessorTests
 ```
 
 ## Debugging in Visual Studio

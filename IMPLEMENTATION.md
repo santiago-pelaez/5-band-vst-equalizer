@@ -6,6 +6,8 @@ The plugin is split into host integration, DSP, parameter definitions, and UI co
 
 `PluginProcessor` owns the `AudioProcessorValueTreeState`, audio-owned EQ bands, output-gain smoothing, bypass smoothing, and state serialization. `PluginEditor` owns controls and APVTS attachments. `FrequencyResponseDisplay` is a message-thread GUI component and does not participate in audio processing.
 
+`SpectrumAnalyzer` observes the input and final output samples on the audio thread, computes fixed-size 2048-point Hann-windowed FFT frames, and publishes them through a preallocated single-producer/single-consumer FIFO. The editor polls the newest frame at 30 Hz and applies GUI-only smoothing before drawing the two spectrum traces. The analyzer does not change the audio buffer.
+
 ## Parameter flow
 
 1. The host or UI changes an APVTS parameter.

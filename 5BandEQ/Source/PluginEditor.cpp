@@ -93,9 +93,13 @@ FiveBandEQProcessorEditor::FiveBandEQProcessorEditor(FiveBandEQProcessor &proces
     // one explicit final layout after every panel and global control has been
     // created so the initial editor matches the layout used after resizing.
     resized();
+    startTimerHz(30);
 }
 
-FiveBandEQProcessorEditor::~FiveBandEQProcessorEditor() = default;
+FiveBandEQProcessorEditor::~FiveBandEQProcessorEditor()
+{
+    stopTimer();
+}
 
 void FiveBandEQProcessorEditor::paint(juce::Graphics &graphics)
 {
@@ -129,6 +133,14 @@ void FiveBandEQProcessorEditor::paint(juce::Graphics &graphics)
                       160,
                       20,
                       juce::Justification::left);
+}
+
+void FiveBandEQProcessorEditor::timerCallback()
+{
+    if (! audioProcessor.copyLatestSpectrumFrame(latestSpectrumFrame))
+        return;
+
+    frequencyResponseDisplay.setSpectrumFrame(latestSpectrumFrame);
 }
 
 void FiveBandEQProcessorEditor::resized()

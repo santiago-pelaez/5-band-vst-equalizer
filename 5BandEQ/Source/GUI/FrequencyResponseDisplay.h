@@ -3,6 +3,7 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include <functional>
 #include "../DSP/BiquadFilter.h"
+#include "../DSP/SpectrumAnalyzer.h"
 
 /**
  * Professional frequency response visualization component
@@ -67,6 +68,8 @@ public:
      */
     void setSampleRate(double newSampleRate);
 
+    void setSpectrumFrame(const SpectrumAnalyzer::SpectrumFrame &frame);
+
 private:
     //==============================================================================
     static constexpr int NUM_BANDS = 5;
@@ -75,6 +78,8 @@ private:
     static constexpr float MAX_FREQUENCY = 20000.0f;
     static constexpr float MIN_GAIN_DB = -24.0f;
     static constexpr float MAX_GAIN_DB = 24.0f;
+    static constexpr float MIN_SPECTRUM_DB = -96.0f;
+    static constexpr float MAX_SPECTRUM_DB = 0.0f;
 
     // Band parameters for response calculation
     struct BandParams
@@ -91,6 +96,10 @@ private:
     // Pre-calculated frequency response curve
     std::array<float, RESPONSE_CURVE_POINTS> responseData;
     std::array<float, RESPONSE_CURVE_POINTS> frequencyPoints;
+    std::array<float, SpectrumAnalyzer::SPECTRUM_BINS> inputSpectrumData;
+    std::array<float, SpectrumAnalyzer::SPECTRUM_BINS> outputSpectrumData;
+    bool hasSpectrumData = false;
+    double spectrumSampleRate = 44100.0;
 
     // Sample rate for calculations (will be set from processor)
     double sampleRate = 44100.0;
@@ -102,6 +111,7 @@ private:
     float gainToY(float gainDB, float height) const;
     float xToFrequency(float x, float width) const;
     float yToGain(float y, float height) const;
+    float spectrumDBToY(float decibels, float height) const;
 
     // DSP calculation functions
     void calculateFrequencyPoints();
@@ -112,6 +122,11 @@ private:
     void drawGrid(juce::Graphics &g);
     void drawFrequencyLabels(juce::Graphics &g);
     void drawGainLabels(juce::Graphics &g);
+    void drawSpectrum(juce::Graphics &g);
+    void drawSpectrumTrace(juce::Graphics &g,
+                           const std::array<float, SpectrumAnalyzer::SPECTRUM_BINS> &spectrum,
+                           juce::Colour colour);
+    void drawSpectrumLegend(juce::Graphics &g);
     void drawResponseCurve(juce::Graphics &g);
     void drawNodes(juce::Graphics &g);
 

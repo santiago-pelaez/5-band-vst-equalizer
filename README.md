@@ -24,14 +24,16 @@ AU and AAX are not part of the current release. They are not claimed or tested.
 - Mono and stereo processing paths.
 - Smoothed output gain.
 - Click-resistant bypass transition.
-- Logarithmic combined frequency-response display.
-- Automated tests for filter restrictions and coefficient behavior.
+- Logarithmic combined frequency-response display with draggable EQ nodes.
+- Real-time input and output spectrum traces overlaid on the EQ response.
+- Lower band panels for exact frequency, gain, Q, filter type, and enable control.
+- Automated DSP, parameter/state, spectrum, and processor integration tests.
 
 ## Project status
 
-The source-controlled CMake build has been added and successfully compiled with the available Visual Studio 2022/MSVC toolchain and JUCE 8.0.10 installation. Release Standalone and VST3 targets build successfully, the VST3 bundle contains generated metadata, and the DSP test target passes under CTest. The Standalone application has also been manually inspected.
+The source-controlled CMake build has been compiled with the available Visual Studio 2022/MSVC toolchain and JUCE 8.0.10 installation. Debug and Release Standalone and VST3 targets build successfully. All four automated CTest targets pass: DSP, parameter/state, spectrum analyzer, and processor integration tests.
 
-Formal DAW validation, screenshots, and final portfolio evidence remain pending until they are performed and recorded with a host version and test date.
+Standalone and informal Ableton testing have been performed during development. Formal REAPER validation, screenshots, and final portfolio evidence remain pending until they are performed and recorded with a host version and test date.
 
 ## Repository structure
 
@@ -82,6 +84,9 @@ Open the repository folder in Visual Studio. Select the appropriate CMake preset
 - `FiveBandEQ_Standalone`
 - `FiveBandEQ_VST3`
 - `FiveBandEQ_Tests`
+- `FiveBandEQ_ParameterTests`
+- `FiveBandEQ_SpectrumTests`
+- `FiveBandEQ_ProcessorTests`
 
 The project includes presets for Visual Studio 2026 and a compatibility preset for the currently installed Visual Studio 2022 generator.
 
@@ -91,14 +96,14 @@ For Visual Studio 2022 compatibility:
 
 ```powershell
 cmake --preset windows-vs2022
-cmake --build build/windows-vs2022 --config Release --target FiveBandEQ_Standalone FiveBandEQ_VST3 FiveBandEQ_Tests
+cmake --build build/windows-vs2022 --config Release --target FiveBandEQ_Standalone FiveBandEQ_VST3 FiveBandEQ_Tests FiveBandEQ_ParameterTests FiveBandEQ_SpectrumTests FiveBandEQ_ProcessorTests
 ```
 
 For Visual Studio 2026:
 
 ```powershell
 cmake --preset windows-release
-cmake --build build/windows-release --config Release --target FiveBandEQ_Standalone FiveBandEQ_VST3 FiveBandEQ_Tests
+cmake --build build/windows-release --config Release --target FiveBandEQ_Standalone FiveBandEQ_VST3 FiveBandEQ_Tests FiveBandEQ_ParameterTests FiveBandEQ_SpectrumTests FiveBandEQ_ProcessorTests
 ```
 
 To use another JUCE location:
@@ -126,7 +131,13 @@ Do not commit built plugin bundles to Git.
 
 ## Testing
 
-Run the focused DSP test executable through the selected build target. The tests currently cover coefficient finiteness, neutral peak behavior, and band filter restrictions.
+Run the complete test suite through CTest:
+
+```powershell
+ctest --test-dir build/windows-vs2022 -C Release --output-on-failure
+```
+
+The suite covers coefficient behavior, filter restrictions, parameter/state recall, FFT peak detection, stereo spectrum averaging, processor mono/stereo behavior, channel isolation, output-gain smoothing, bypass, and analyzer integration.
 
 The intended manual host-validation target is REAPER. The validation checklist is in [`docs/TESTING.md`](docs/TESTING.md). DAW compatibility is not claimed until that checklist has been completed.
 
@@ -134,14 +145,13 @@ The intended manual host-validation target is REAPER. The validation checklist i
 
 Each band uses a stereo pair of Direct Form II Transposed biquad filters. Parameter targets are smoothed over a short interval to reduce clicks during automation and manual control changes. Coefficients are updated from audio-owned state, while APVTS remains the host-facing parameter source.
 
-The response display calculates the combined magnitude response using the same filter coefficient model. It runs on the message thread and is not part of the audio callback.
+The response display calculates the combined magnitude response using the same filter coefficient model. The spectrum analyzer captures input before EQ and output after the complete processing path, computes a preallocated 2048-point Hann-windowed FFT, and transfers fixed-size frames through a lock-free single-producer/single-consumer queue. The GUI reads frames at approximately 30 Hz and applies visual-only smoothing. Neither the graph nor the analyzer performs GUI work in the audio callback.
 
 More detail is available in [`docs/DSP.md`](docs/DSP.md) and [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
 
 ## Known limitations and next steps
 
 - REAPER validation and screenshots are still pending.
-- There is no spectrum analyzer.
 - There is no preset browser or factory-preset system.
 - There is no installer or code signing.
 - AU and AAX are not supported by this Windows release.

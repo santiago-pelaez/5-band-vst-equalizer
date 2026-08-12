@@ -9,6 +9,8 @@ FrequencyResponseDisplay::FrequencyResponseDisplay()
 {
     calculateFrequencyPoints();
     responseData.fill(0.0f);
+    inputSpectrumData.fill(MIN_SPECTRUM_DB);
+    outputSpectrumData.fill(MIN_SPECTRUM_DB);
 
     for (int bandIndex = 0; bandIndex < NUM_BANDS; ++bandIndex)
     {
@@ -25,7 +27,37 @@ FrequencyResponseDisplay::~FrequencyResponseDisplay() = default;
 void FrequencyResponseDisplay::setSampleRate(double newSampleRate)
 {
     sampleRate = std::isfinite(newSampleRate) && newSampleRate > 1.0 ? newSampleRate : 44100.0;
+    spectrumSampleRate = sampleRate;
     updateResponse();
+}
+
+void FrequencyResponseDisplay::setSpectrumFrame(const SpectrumAnalyzer::SpectrumFrame &frame)
+{
+    constexpr float spectrumSmoothingAmount = 0.35f;
+    const bool frameHasValidSampleRate = std::isfinite(frame.sampleRate) && frame.sampleRate > 1.0;
+    const bool sampleRateChanged = frameHasValidSampleRate && std::abs(sampleRate - frame.sampleRate) > 0.5;
+
+    if (frameHasValidSampleRate)
+    {
+        sampleRate = frame.sampleRate;
+        spectrumSampleRate = frame.sampleRate;
+    }
+
+    for (size_t binIndex = 0; binIndex < inputSpectrumData.size(); ++binIndex)
+    {
+        inputSpectrumData[binIndex] = juce::jmap(spectrumSmoothingAmount,
+                                                inputSpectrumData[binIndex],
+                                                frame.inputSpectrum[binIndex]);
+        outputSpectrumData[binIndex] = juce::jmap(spectrumSmoothingAmount,
+                                                 outputSpectrumData[binIndex],
+                                                 frame.outputSpectrum[binIndex]);
+    }
+    hasSpectrumData = true;
+
+    if (sampleRateChanged)
+        calculateResponseCurve();
+
+    repaint();
 }
 
 void FrequencyResponseDisplay::paint(juce::Graphics &graphics)
@@ -40,12 +72,14 @@ void FrequencyResponseDisplay::paint(juce::Graphics &graphics)
 
     graphics.setColour(juce::Colours::lightgrey);
     graphics.setFont(11.0f);
-    graphics.drawText("EQ RESPONSE", plotBounds.getX() + 8, plotBounds.getY() + 4, 100, 16,
+    graphics.drawText("SPECTRUM + EQ RESPONSE", plotBounds.getX() + 8, plotBounds.getY() + 4, 180, 16,
                       juce::Justification::left);
 
     drawGrid(graphics);
     drawFrequencyLabels(graphics);
     drawGainLabels(graphics);
+    drawSpectrum(graphics);
+    drawSpectrumLegend(graphics);
     drawResponseCurve(graphics);
     drawNodes(graphics);
 }
@@ -170,6 +204,22 @@ float FrequencyResponseDisplay::yToGain(float y, float height) const
     return MIN_GAIN_DB + normalizedY * (MAX_GAIN_DB - MIN_GAIN_DB);
 }
 
+float FrequencyResponseDisplay::spectrumDBToY(float decibels, float height) const
+{
+    if (height <= 0.0f)
+        return 0.0f;
+
+    const float safeDecibels = std::isfinite(decibels) ? decibels : MIN_SPECTRUM_DB;
+    const float normalizedMagnitude = juce::jmap(
+        juce::jlimit(MIN_SPECTRUM_DB, MAX_SPECTRUM_DB, safeDecibels),
+        MIN_SPECTRUM_DB,
+        MAX_SPECTRUM_DB,
+        0.0f,
+        1.0f);
+
+    return height * (1.0f - normalizedMagnitude);
+}
+
 void FrequencyResponseDisplay::calculateFrequencyPoints()
 {
     const float logMinimum = std::log10(MIN_FREQUENCY);
@@ -281,6 +331,89 @@ void FrequencyResponseDisplay::drawGainLabels(juce::Graphics &graphics)
         graphics.drawText(juce::String(static_cast<int>(gain)) + "dB", 2, y - 6, 36, 12,
                           juce::Justification::left);
     }
+}
+
+void FrequencyResponseDisplay::drawSpectrum(juce::Graphics &graphics)
+{
+    if (! hasSpectrumData)
+        return;
+
+    drawSpectrumTrace(graphics,
+                      inputSpectrumData,
+                      juce::Colour::fromRGB(80, 190, 240).withAlpha(0.62f));
+    drawSpectrumTrace(graphics,
+                      outputSpectrumData,
+                      juce::Colour::fromRGB(120, 220, 170).withAlpha(0.72f));
+}
+
+void FrequencyResponseDisplay::drawSpectrumTrace(
+    juce::Graphics &graphics,
+    const std::array<float, SpectrumAnalyzer::SPECTRUM_BINS> &spectrum,
+    juce::Colour colour)
+{
+    const auto plotBounds = getPlotBounds();
+    const float width = static_cast<float>(plotBounds.getWidth());
+    const float height = static_cast<float>(plotBounds.getHeight());
+    juce::Path spectrumPath;
+    bool pathHasStarted = false;
+
+    for (int binIndex = 1; binIndex < SpectrumAnalyzer::SPECTRUM_BINS; ++binIndex)
+    {
+        const float frequency = static_cast<float>(binIndex) * static_cast<float>(spectrumSampleRate)
+                              / static_cast<float>(SpectrumAnalyzer::FFT_SIZE);
+
+        if (frequency < MIN_FREQUENCY)
+            continue;
+
+        if (frequency > MAX_FREQUENCY)
+            break;
+
+        const float x = static_cast<float>(plotBounds.getX()) + frequencyToX(frequency, width);
+        const float y = static_cast<float>(plotBounds.getY())
+                      + spectrumDBToY(spectrum[static_cast<size_t>(binIndex)], height);
+
+        if (! pathHasStarted)
+        {
+            spectrumPath.startNewSubPath(x, y);
+            pathHasStarted = true;
+            continue;
+        }
+
+        spectrumPath.lineTo(x, y);
+    }
+
+    if (! pathHasStarted)
+        return;
+
+    graphics.setColour(colour);
+    graphics.strokePath(spectrumPath,
+                        juce::PathStrokeType(1.25f, juce::PathStrokeType::curved));
+}
+
+void FrequencyResponseDisplay::drawSpectrumLegend(juce::Graphics &graphics)
+{
+    const auto plotBounds = getPlotBounds();
+    const int legendWidth = 250;
+    const int legendX = plotBounds.getRight() - legendWidth - 8;
+    const int legendY = plotBounds.getY() + 5;
+
+    graphics.setColour(juce::Colour::fromRGB(20, 23, 30).withAlpha(0.82f));
+    graphics.fillRoundedRectangle(static_cast<float>(legendX),
+                                  static_cast<float>(legendY),
+                                  static_cast<float>(legendWidth),
+                                  22.0f,
+                                  4.0f);
+
+    graphics.setFont(10.0f);
+    graphics.setColour(juce::Colour::fromRGB(80, 190, 240));
+    graphics.drawText("INPUT", legendX + 8, legendY + 5, 42, 12, juce::Justification::left);
+    graphics.setColour(juce::Colour::fromRGB(120, 220, 170));
+    graphics.drawText("OUTPUT", legendX + 57, legendY + 5, 52, 12, juce::Justification::left);
+    graphics.setColour(juce::Colour::fromRGB(255, 140, 0));
+    graphics.drawText("EQ", legendX + 117, legendY + 5, 24, 12, juce::Justification::left);
+    graphics.setColour(juce::Colours::lightgrey);
+    graphics.drawText("spectrum -96 to 0 dBFS", legendX + 146, legendY + 5, 98, 12,
+                      juce::Justification::left);
 }
 
 void FrequencyResponseDisplay::drawResponseCurve(juce::Graphics &graphics)

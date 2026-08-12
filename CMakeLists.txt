@@ -21,6 +21,7 @@ set(FIVE_BAND_EQ_SOURCES
     5BandEQ/Source/PluginProcessor.cpp
     5BandEQ/Source/DSP/BiquadFilter.cpp
     5BandEQ/Source/DSP/EQBand.cpp
+    5BandEQ/Source/DSP/SpectrumAnalyzer.cpp
     5BandEQ/Source/GUI/BandControlPanel.cpp
     5BandEQ/Source/GUI/FrequencyResponseDisplay.cpp
 )
@@ -75,15 +76,33 @@ if(FIVE_BAND_EQ_BUILD_TESTS)
         5BandEQ/Source/DSP/BiquadFilter.cpp
     )
 
+    add_executable(FiveBandEQ_SpectrumTests
+        Tests/SpectrumAnalyzerTests.cpp
+        5BandEQ/Source/DSP/SpectrumAnalyzer.cpp
+    )
+
     add_executable(FiveBandEQ_ParameterTests
         Tests/ParameterStateTests.cpp
+    )
+
+    add_executable(FiveBandEQ_ProcessorTests
+        Tests/ProcessorAudioTests.cpp
     )
 
     target_include_directories(FiveBandEQ_Tests PRIVATE
         5BandEQ/Source
     )
 
+    target_include_directories(FiveBandEQ_SpectrumTests PRIVATE
+        5BandEQ/Source
+    )
+
     target_compile_definitions(FiveBandEQ_Tests PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+    )
+
+    target_compile_definitions(FiveBandEQ_SpectrumTests PRIVATE
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
     )
@@ -96,11 +115,28 @@ if(FIVE_BAND_EQ_BUILD_TESTS)
         juce::juce_recommended_warning_flags
     )
 
+    target_link_libraries(FiveBandEQ_SpectrumTests PRIVATE
+        juce::juce_core
+        juce::juce_audio_basics
+        juce::juce_dsp
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+    )
+
     target_include_directories(FiveBandEQ_ParameterTests PRIVATE
         5BandEQ/Source
     )
 
+    target_include_directories(FiveBandEQ_ProcessorTests PRIVATE
+        5BandEQ/Source
+    )
+
     target_compile_definitions(FiveBandEQ_ParameterTests PRIVATE
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+    )
+
+    target_compile_definitions(FiveBandEQ_ProcessorTests PRIVATE
         JUCE_WEB_BROWSER=0
         JUCE_USE_CURL=0
     )
@@ -113,6 +149,19 @@ if(FIVE_BAND_EQ_BUILD_TESTS)
         juce::juce_recommended_warning_flags
     )
 
+    target_link_libraries(FiveBandEQ_ProcessorTests PRIVATE
+        FiveBandEQ
+        juce::juce_audio_utils
+        juce::juce_audio_processors
+        juce::juce_audio_basics
+        juce::juce_core
+        juce::juce_dsp
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+    )
+
     add_test(NAME FiveBandEQ_DspTests COMMAND FiveBandEQ_Tests)
+    add_test(NAME FiveBandEQ_SpectrumTests COMMAND FiveBandEQ_SpectrumTests)
     add_test(NAME FiveBandEQ_ParameterTests COMMAND FiveBandEQ_ParameterTests)
+    add_test(NAME FiveBandEQ_ProcessorTests COMMAND FiveBandEQ_ProcessorTests)
 endif()

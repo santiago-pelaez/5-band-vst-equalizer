@@ -3,6 +3,7 @@
 #include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_core/juce_core.h>
 #include "DSP/EQBand.h"
+#include "DSP/SpectrumAnalyzer.h"
 #include "Utils/Parameters.h"
 #include "Utils/Constants.h"
 
@@ -57,6 +58,11 @@ public:
     // Parameter access for editor
     juce::AudioProcessorValueTreeState &getAPVTS() { return apvts; }
 
+    bool copyLatestSpectrumFrame(SpectrumAnalyzer::SpectrumFrame &destination)
+    {
+        return spectrumAnalyzer.readLatestFrame(destination);
+    }
+
 private:
     //==============================================================================
     juce::AudioProcessorValueTreeState apvts;
@@ -67,6 +73,7 @@ private:
     // Output gain and bypass
     juce::SmoothedValue<float> outputGain;
     juce::SmoothedValue<float> bypassMix;
+    SpectrumAnalyzer spectrumAnalyzer;
     std::atomic<bool> parametersNeedSynchronization{true};
 
     struct BandParameterPointers
